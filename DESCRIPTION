@@ -1,0 +1,16 @@
+Package: labtaxa
+Type: Package
+Title: Fetch and Process USDA-NRCS-NCSS Lab Data Mart 'SQLite' Snapshot
+Version: 0.0.1.9000
+Author: Andrew Brown
+Maintainer: Andrew G. Brown <andrew.g.brown@usda.gov>
+Description: Supports automatic download of 'Lab Data Mart' (<https://ncsslabdatamart.sc.egov.usda.gov/>) database snapshots. Applies patches to the cached database for testing and use in R.
+License: CC0
+Depends: R (>= 4.1)
+Imports: RSQLite, soilDB
+Suggests: RSelenium
+Encoding: UTF-8
+LazyData: true
+Language: en-US
+RoxygenNote: 7.2.3
+Roxygen: list(markdown = TRUE)
