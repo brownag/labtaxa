@@ -2,6 +2,7 @@
 
 export(cache_labtaxa)
 export(get_LDM_snapshot)
+export(ldm_db_download_url)
 export(load_labtaxa)
 importClassesFrom(aqp,SoilProfileCollection)
 importFrom(aqp,horizons)

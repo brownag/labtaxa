@@ -2,21 +2,33 @@
 % Please edit documentation in R/snapshot.R
 \name{get_LDM_snapshot}
 \alias{get_LDM_snapshot}
+\alias{ldm_db_download_url}
 \title{Get 'Lab Data Mart' 'SQLite' Snapshot}
 \usage{
 get_LDM_snapshot(
   ...,
-  basename = "NCSSLabDataMartSQLite.sqlite3",
+  cache = TRUE,
+  companion = "LDMCompanion.gpkg",
+  basename = "ncss_labdatagpkg.zip",
+  cachename = "cached-LDM-SPC.rds",
   dirname = tools::R_user_dir(package = "labtaxa"),
   default_dir = "~/Downloads",
   port = 4567L,
-  baseurl = "https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"
+  baseurl = ldm_db_download_url()
 )
+
+ldm_db_download_url()
 }
 \arguments{
 \item{...}{Arguments passed to \code{soilDB::fetchLDM()}}
 
-\item{basename}{Default: \code{"NCSSLabDataMartSQLite.sqlite3"}}
+\item{cache}{Default: \code{TRUE}; store result \code{SoilProfileCollection} object in an RDS file in the \code{labtaxa} user data directory and load it rather than rebuilding on subsequent calls?}
+
+\item{companion}{File name to use for companion morphologic database. Default: \code{"LDMCompanion.zip"}}
+
+\item{basename}{Default: \code{"ncss_labdatagpkg.zip"}}
+
+\item{cachename}{File name to use for cache RDS file containing SoilProfileCollection of combined LDM snapshots. Default: \verb{"cached-LDM-SPC.rds",}}
 
 \item{dirname}{Data cache diretory for \code{labtaxa} package. Default: \code{tools::R_user_dir(package = "labtaxa")}.}
 

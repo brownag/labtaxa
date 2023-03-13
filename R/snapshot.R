@@ -4,9 +4,11 @@
 #'
 #' @param ... Arguments passed to `soilDB::fetchLDM()`
 #' @param cache Default: `TRUE`; store result `SoilProfileCollection` object in an RDS file in the `labtaxa` user data directory and load it rather than rebuilding on subsequent calls?
-#' @param basename Default: `"NCSSLabDataMartSQLite.sqlite3"`
+#' @param basename Default: `"ncss_labdatagpkg.zip"`
 #' @param dirname Data cache diretory for `labtaxa` package. Default: `tools::R_user_dir(package = "labtaxa")`.
 #' @param default_dir Default directory where RSelenium Gecko (Firefox) downloads files. Default: `"~/Downloads"`. Customize as needed.
+#' @param cachename File name to use for cache RDS file containing SoilProfileCollection of combined LDM snapshots. Default: `"cached-LDM-SPC.rds",`
+#' @param companion File name to use for companion morphologic database. Default: `"LDMCompanion.zip"`
 #' @param port Default: `4567L`
 #' @param baseurl Default: `"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"`
 #' @importFrom soilDB fetchLDM
@@ -21,13 +23,13 @@
 #' }
 get_LDM_snapshot <- function(...,
                              cache = TRUE,
-    basename = "NCSSLabDataMartSQLite.sqlite3",
-    cachename = "cached-LDM-SPC.rds",
-    dirname = tools::R_user_dir(package = "labtaxa"),
-    default_dir = "~/Downloads",
-    port = 4567L,
-    baseurl = "https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"
-) {
+                             companion = "LDMCompanion.gpkg",
+                             basename = "ncss_labdatagpkg.zip",
+                             cachename = "cached-LDM-SPC.rds",
+                             dirname = tools::R_user_dir(package = "labtaxa"),
+                             default_dir = "~/Downloads",
+                             port = 4567L,
+                             baseurl = ldm_db_download_url()) {
 
   cp <- file.path(dirname, cachename)
   fp <- file.path(dirname, basename)
@@ -38,9 +40,16 @@ get_LDM_snapshot <- function(...,
 
   stopifnot(requireNamespace("RSQLite"))
 
-  if (!file.exists(fp)) {
-   .get_ldm_snapshot(port = port, baseurl = baseurl)
-   .patch_ldm_snapshot(fp)
+  if (!file.exists(fp) || !cache) {
+    .get_ldm_snapshot(
+      port = port,
+      dirname = dirname,
+      basename = basename,
+      default_dir = default_dir,
+      baseurl = baseurl,
+      companion = companion
+    )
+    .patch_ldm_snapshot(fp)
   }
 
   res <- soilDB::fetchLDM(dsn = fp, chunk.size = 1e7, ...)
@@ -49,8 +58,10 @@ get_LDM_snapshot <- function(...,
   }
 }
 
-.ldm_db_download_url <- function() {
-  "https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"
+#' @export
+#' @rdname get_LDM_snapshot
+ldm_db_download_url <- function() {
+ "https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx#tabularSpatial"
 }
 
 .patch_ldm_snapshot <- function(dsn, ...) {
@@ -69,13 +80,13 @@ get_LDM_snapshot <- function(...,
 }
 
 .get_ldm_snapshot <- function(dirname = tools::R_user_dir("labtaxa"),
-                              basename = "NCSSLabDataMartSQLite.sqlite3",
+                              basename = "ncss_labdatagpkg.zip",
                               default_dir = "~/Downloads",
                               port = 4567L,
-                              baseurl = .ldm_db_download_url) {
+                              baseurl = ldm_db_download_url(),
+                              companion = "LDMCompanion.gpkg") {
 
   stopifnot(requireNamespace("RSelenium"))
-
   target_dir <- dirname
   if (!dir.exists(target_dir)) {
     dir.create(target_dir, recursive = TRUE)
@@ -88,36 +99,38 @@ get_LDM_snapshot <- function(...,
     "moz:firefoxOptions" = list(args = list('--headless'))
   )
   res <- try({rD <- RSelenium::rsDriver(browser = "firefox",
-                                       chromever = NULL,
-                                       extraCapabilities = eCaps,
+                                        chromever = NULL,
+                                        extraCapabilities = eCaps,
                                        port = as.integer(port))})
-  stopifnot(!inherits(rD, 'try-error'))
+  stopifnot(!inherits(res, 'try-error'))
+
   remDr <- rD[["client"]]
   remDr$open()
   on.exit(remDr$close())
 
   remDr$navigate(baseurl)
-
-  webElem <- remDr$findElement("id", "btnDownloadSQLiteFile")
+  webElem <- remDr$findElement("id", "btnDownloadSpatialGeoPackageFile")
   webElem$clickElement()
 
-  orig_file_name <- list.files(target_dir, "NCSSLabDataMartSQLite.*.zip$")
-  orig_dfile_name <- list.files(default_dir, "NCSSLabDataMartSQLite.*.zip$")
+  orig_file_name <- list.files(target_dir, basename)
+  orig_dfile_name <- list.files(default_dir, basename)
   ncycle <- 0
   file_name <- dfile_name <- character()
 
   # wait for downloaded file to appear in browser download directory
   while (length(file_name) <= length(orig_file_name) &
          length(dfile_name) <= length(orig_dfile_name)) {
-    file_name <- list.files(target_dir, "NCSSLabDataMartSQLite.*.zip$", full.names = TRUE)
-    dfile_name <- list.files(default_dir, "NCSSLabDataMartSQLite.*.zip$", full.names = TRUE)
+    file_name <- list.files(target_dir, basename, full.names = TRUE)
+    dfile_name <- list.files(default_dir, basename, full.names = TRUE)
     if (length(dfile_name) > 0 || length(file_name) > 0) {
-      if (file.size(dfile_name[1]) > 0 || file.size(dfile_name[1]) > 0) {
+      if ((!is.na(dfile_name[1]) && file.size(dfile_name[1]) > 0)
+          || (!is.na(file_name[1]) && file.size(file_name[1]) > 0)) {
         break;
       }
     }
     Sys.sleep(1)
     ncycle <- ncycle + 1
+    print(ncycle)
     if (ncycle > 480)
       break
   }
@@ -126,5 +139,15 @@ get_LDM_snapshot <- function(...,
   new_dfile_name <- dfile_name[!dfile_name %in% orig_dfile_name]
   file.copy(new_dfile_name, target_dir)
   file.remove(new_dfile_name)
+
+  if (nchar(companion) > 0 && !file.exists(companion)) {
+    # download companion db
+    oldtimeout <- getOption("timeout")
+    options(timeout = 1e5)
+    download.file("https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download", destfile = lc)
+    options(timeout = oldtimeout)
+  }
+
   unzip(list.files(target_dir, "zip$", full.names = TRUE), exdir = target_dir)
+
 }
