@@ -22,12 +22,13 @@ RUN apt-get update \
     libxml2-dev \
     libsqlite3-dev \
     libfribidi-dev \
-    libudunits2-dev
+    libudunits2-dev \
+    default-jre \ 
+    default-jdk
 
 RUN install2.r --error \
     --deps TRUE \
     devtools \
-    whitebox \
     Rcpp \
     terra \
     sf \
