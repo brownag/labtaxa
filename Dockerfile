@@ -26,7 +26,14 @@ RUN apt-get update \
     default-jre \ 
     default-jdk \
     libcurl4-openssl-dev \
-    wget
+    wget \
+    bzip2 \
+    libxtst6 \
+    libgtk-3-0 \
+    libx11-xcb-dev \
+    libdbus-glib-1-2 \
+    libxt6 \
+    libpci-dev
 RUN wget https://download-installer.cdn.mozilla.net/pub/firefox/releases/109.0/linux-x86_64/en-US/firefox-109.0.tar.bz2
 RUN tar -xjf firefox-*.tar.bz2
 RUN mv firefox /opt
