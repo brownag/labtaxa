@@ -25,8 +25,13 @@ RUN apt-get update \
     libudunits2-dev \
     default-jre \ 
     default-jdk \
-    firefox
-    
+    libcurl4-openssl-dev \
+    wget
+RUN wget https://download-installer.cdn.mozilla.net/pub/firefox/releases/109.0/linux-x86_64/en-US/firefox-109.0.tar.bz2
+RUN tar -xjf firefox-*.tar.bz2
+RUN mv firefox /opt
+RUN ln -s /opt/firefox/firefox /usr/local/bin/firefox
+
 RUN install2.r --error \
     --deps TRUE \
     devtools \
