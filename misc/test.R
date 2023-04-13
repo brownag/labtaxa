@@ -1,9 +1,9 @@
 library(aqp)
 library(labtaxa)
-
+labtaxa <- ldm_db_download_url()
 ldm <- load_labtaxa()
 
-if (is.null(ldm)) {
+if (is.null(ldm) || inherits(ldm, 'try-error')) {
   ldm <- get_LDM_snapshot(cache = FALSE)
   cache_labtaxa(ldm)
 }

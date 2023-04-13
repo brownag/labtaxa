@@ -7,7 +7,7 @@ Maintainer: Andrew G. Brown <andrew.g.brown@usda.gov>
 Description: Supports automatic download of 'Lab Data Mart' (<https://ncsslabdatamart.sc.egov.usda.gov/>) database snapshots. Applies patches to the cached database for testing and use in R.
 License: CC0
 Depends: R (>= 4.1)
-Imports: RSQLite, soilDB
+Imports: RSQLite, aqp, soilDB
 Suggests: RSelenium
 Encoding: UTF-8
 LazyData: true

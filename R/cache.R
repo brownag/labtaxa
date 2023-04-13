@@ -19,7 +19,7 @@ cache_labtaxa <- function(x,
   fp <- file.path(destdir, filename)
   saveRDS(x, file = fp)
   invisible(fp)
-}()
+}
 
 #' @param silent Suppress error messages? Passed to `try()`. Default `FALSE`
 #' @return `load_labtaxa()`: Read a .rds file (`filename`) from `destdir` (the labtaxa "user data" directory). Returns the object contained in the file, or `try-error` on failure to read file.

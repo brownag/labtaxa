@@ -79,6 +79,7 @@ ldm_db_download_url <- function() {
   })
 }
 
+#' @importFrom utils download.file unzip
 .get_ldm_snapshot <- function(dirname = tools::R_user_dir("labtaxa"),
                               basename = "ncss_labdatagpkg.zip",
                               default_dir = "~/Downloads",
@@ -92,7 +93,7 @@ ldm_db_download_url <- function() {
     dir.create(target_dir, recursive = TRUE)
   }
 
-  fprof <- RSelenium::makeFirefoxProfile(list(browser.download.dir = target_dir,
+  fprof <- RSelenium::makeFirefoxProfile(list(browser.download.dir = normalizePath(target_dir),
                                               browser.download.folderList = 2))
   eCaps <- list(
     firefox_profile = fprof$firefox_profile,
@@ -130,7 +131,7 @@ ldm_db_download_url <- function() {
     }
     Sys.sleep(1)
     ncycle <- ncycle + 1
-    print(ncycle)
+    # print(ncycle)
     if (ncycle > 480)
       break
   }
@@ -144,10 +145,10 @@ ldm_db_download_url <- function() {
     # download companion db
     oldtimeout <- getOption("timeout")
     options(timeout = 1e5)
-    download.file("https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download", destfile = lc)
+    utils::download.file("https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download", destfile = companion)
     options(timeout = oldtimeout)
   }
 
-  unzip(list.files(target_dir, "zip$", full.names = TRUE), exdir = target_dir)
+  utils::unzip(list.files(target_dir, "zip$", full.names = TRUE), exdir = target_dir)
 
 }
