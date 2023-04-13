@@ -24,8 +24,9 @@ RUN apt-get update \
     libfribidi-dev \
     libudunits2-dev \
     default-jre \ 
-    default-jdk
-
+    default-jdk \
+    firefox
+    
 RUN install2.r --error \
     --deps TRUE \
     devtools \
