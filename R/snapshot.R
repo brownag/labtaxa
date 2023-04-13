@@ -102,7 +102,11 @@ ldm_data_dir <- function() {
     dir.create(target_dir, recursive = TRUE)
   }
 
-  fprof <- RSelenium::makeFirefoxProfile(list(browser.download.dir = normalizePath(default_dir),
+  if (!dir.exists(default_dir)) {
+    dir.create(default_dir, recursive = TRUE)
+  }
+  
+  fprof <- RSelenium::makeFirefoxProfile(list(browser.download.dir = normalizePath(target_dir),
                                               browser.download.folderList = 2))
   eCaps <- list(
     firefox_profile = fprof$firefox_profile,
@@ -141,15 +145,20 @@ ldm_data_dir <- function() {
     Sys.sleep(1)
     ncycle <- ncycle + 1
     # print(ncycle)
-    if (ncycle > 480)
+    if (ncycle > 240)
       break
   }
 
   # allow download to default directory, just move to target first
   new_dfile_name <- dfile_name[!dfile_name %in% orig_dfile_name]
   file.copy(new_dfile_name, target_dir)
-  file.remove(new_dfile_name)
-
+  # file.remove(new_dfile_name)
+  
+  print(target_dir)
+  print(list.files(target_dir)
+  print(default_dir)
+  print(list.files(default_dir)
+  
   dcompanion <- file.path(target_dir, companion)
   if (nchar(dcompanion) > 0 && !file.exists(dcompanion)) {
     # download companion db
