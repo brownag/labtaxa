@@ -1,0 +1,5 @@
+remotes::install_local()
+library(labtaxa)
+if (!dir.exists("~/Downloads"))
+  dir.create("~/Downloads", recursive = TRUE)
+ldm <- get_LDM_snapshot()
