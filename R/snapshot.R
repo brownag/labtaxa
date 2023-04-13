@@ -64,6 +64,12 @@ ldm_db_download_url <- function() {
  "https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx#tabularSpatial"
 }
 
+#' @export
+#' @rdname get_LDM_snapshot
+ldm_data_dir <- function() {
+  tools::R_user_dir(package = "labtaxa")
+}
+
 .patch_ldm_snapshot <- function(dsn, ...) {
   con <- RSQLite::dbConnect(RSQLite::SQLite(), dsn, ...)
   tbls <- RSQLite::dbListTables(con)
@@ -80,7 +86,7 @@ ldm_db_download_url <- function() {
 }
 
 #' @importFrom utils download.file unzip
-.get_ldm_snapshot <- function(dirname = tools::R_user_dir("labtaxa"),
+.get_ldm_snapshot <- function(dirname = ldm_data_dir(),
                               basename = "ncss_labdatagpkg.zip",
                               default_dir = "~/Downloads",
                               port = 4567L,
@@ -141,11 +147,12 @@ ldm_db_download_url <- function() {
   file.copy(new_dfile_name, target_dir)
   file.remove(new_dfile_name)
 
-  if (nchar(companion) > 0 && !file.exists(companion)) {
+  dcompanion <- file.path(target_dir, companion)
+  if (nchar(dcompanion) > 0 && !file.exists(dcompanion)) {
     # download companion db
     oldtimeout <- getOption("timeout")
     options(timeout = 1e5)
-    utils::download.file("https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download", destfile = companion)
+    utils::download.file("https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download", destfile = dcompanion)
     options(timeout = oldtimeout)
   }
 

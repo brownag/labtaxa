@@ -13,7 +13,7 @@ cache_labtaxa(
 
 load_labtaxa(
   filename = "cached-LDM-SPC.rds",
-  destdir = tools::R_user_dir(package = "labtaxa"),
+  destdir = ldm_data_dir(),
   silent = FALSE
 )
 }

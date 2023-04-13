@@ -3,6 +3,7 @@
 \name{get_LDM_snapshot}
 \alias{get_LDM_snapshot}
 \alias{ldm_db_download_url}
+\alias{ldm_data_dir}
 \title{Get 'Lab Data Mart' 'SQLite' Snapshot}
 \usage{
 get_LDM_snapshot(
@@ -18,6 +19,8 @@ get_LDM_snapshot(
 )
 
 ldm_db_download_url()
+
+ldm_data_dir()
 }
 \arguments{
 \item{...}{Arguments passed to \code{soilDB::fetchLDM()}}

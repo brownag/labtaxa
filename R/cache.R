@@ -26,7 +26,7 @@ cache_labtaxa <- function(x,
 #' @export
 #' @rdname cache_labtaxa
 load_labtaxa <- function(filename = "cached-LDM-SPC.rds",
-                         destdir = tools::R_user_dir(package = "labtaxa"),
+                         destdir = ldm_data_dir(),
                          silent = FALSE) {
   try(readRDS(file.path(destdir, filename)), silent = silent)
 }
