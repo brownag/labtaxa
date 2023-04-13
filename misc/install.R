@@ -1,4 +1,4 @@
-remotes::install_local("labtaxa")
+remotes::install_github("brownag/labtaxa")
 library(labtaxa)
 if (!dir.exists("~/Downloads"))
   dir.create("~/Downloads", recursive = TRUE)
