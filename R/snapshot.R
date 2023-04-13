@@ -67,7 +67,10 @@ ldm_db_download_url <- function() {
 #' @export
 #' @rdname get_LDM_snapshot
 ldm_data_dir <- function() {
-  tools::R_user_dir(package = "labtaxa")
+  d <- tools::R_user_dir(package = "labtaxa")
+  if (!dir.exists(d))
+    dir.create(d, recursive = TRUE)
+  d
 }
 
 .patch_ldm_snapshot <- function(dsn, ...) {
@@ -99,7 +102,7 @@ ldm_data_dir <- function() {
     dir.create(target_dir, recursive = TRUE)
   }
 
-  fprof <- RSelenium::makeFirefoxProfile(list(browser.download.dir = normalizePath(target_dir),
+  fprof <- RSelenium::makeFirefoxProfile(list(browser.download.dir = normalizePath(default_dir),
                                               browser.download.folderList = 2))
   eCaps <- list(
     firefox_profile = fprof$firefox_profile,
