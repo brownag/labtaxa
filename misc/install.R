@@ -1,4 +1,4 @@
-remotes::install_local()
+remotes::install_local("labtaxa")
 library(labtaxa)
 if (!dir.exists("~/Downloads"))
   dir.create("~/Downloads", recursive = TRUE)
