@@ -18,9 +18,35 @@ knitr::opts_chunk$set(
 <!-- badges: start -->
 <!-- badges: end -->
 
-The goal of {labtaxa} is to support automatic download of 'Lab Data Mart' (<https://ncsslabdatamart.sc.egov.usda.gov/>) database snapshots and apply patches to the cached database for testing and use in R.
+## Docker
 
-## Installation
+The goal of {labtaxa} is to support automatic download of 'Lab Data Mart' (<https://ncsslabdatamart.sc.egov.usda.gov/>) database snapshots for use in R.
+
+This repository is an R package used for reproducibly obtaining and caching the contents of the Lab Data Mart Database. 
+
+To get up and running quickly, you can use the Docker container. The `labtaxa` container is based on [`"rocker/rstudio:latest"`](https://hub.docker.com/r/rocker/rstudio). In addition to the standard RStudio tools, the container has the cached Lab Data Mart GeoPackage (containing lab and spatial data) and the companion morphologic database (derived from NASIS pedon descriptions) pre-downloaded. Also, the results of `soilDB::fetchLDM()` called on the LDM GeoPackage data source are cached as an R object file (.rds). Finally, a variety of useful R packages are pre-installed. All can be accessed via an RStudio Server web browser interface.
+
+From Docker Hub:
+
+``` sh
+docker pull brownag/labtaxa:latest
+```
+
+Or from GitHub:
+
+``` sh
+docker pull ghcr.io/brownag/labtaxa:latest
+```
+
+Once you have a local copy of the `labtaxa` container you can run:
+
+``` sh
+docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/ brownag/labtaxa
+```
+
+Then open your web browser and navigate to `http://localhost:8787`. The default username is `rstudio` and the default password is `mypassword`.
+
+## R Package Installation
 
 You can install the development version of {labtaxa} from GitHub:
 
@@ -37,3 +63,5 @@ Download (and cache) the latest Lab Data Mart SQLite snapshot from <https://ncss
 library(labtaxa)
 ldm <- get_LDM_snapshot()
 ```
+
+Downloaded and derived files will be cached in platform-specific directory specified by `ldm_data_dir()`. 
