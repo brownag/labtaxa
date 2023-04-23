@@ -4,7 +4,8 @@
 #'
 #' @param ... Arguments passed to `soilDB::fetchLDM()`
 #' @param cache Default: `TRUE`; store result `SoilProfileCollection` object in an RDS file in the `labtaxa` user data directory and load it rather than rebuilding on subsequent calls?
-#' @param basename Default: `"ncss_labdatagpkg.zip"`
+#' @param dlname Default: `"ncss_labdatagpkg.zip"`
+#' @param dbname Default: `"ncss_labdata.gpkg"`
 #' @param dirname Data cache diretory for `labtaxa` package. Default: `tools::R_user_dir(package = "labtaxa")`.
 #' @param default_dir Default directory where RSelenium Gecko (Firefox) downloads files. Default: `"~/Downloads"`. Customize as needed.
 #' @param cachename File name to use for cache RDS file containing SoilProfileCollection of combined LDM snapshots. Default: `"cached-LDM-SPC.rds",`
@@ -45,7 +46,7 @@ get_LDM_snapshot <- function(...,
     .get_ldm_snapshot(
       port = port,
       dirname = dirname,
-      basename = dlname,
+      dlname = dlname,
       default_dir = default_dir,
       baseurl = baseurl,
       companion = companion
@@ -91,8 +92,9 @@ ldm_data_dir <- function() {
 }
 
 #' @importFrom utils download.file unzip
+#' @importFrom RSelenium makeFirefoxProfile rsDriver
 .get_ldm_snapshot <- function(dirname = ldm_data_dir(),
-                              basename = "ncss_labdatagpkg.zip",
+                              dlname = "ncss_labdatagpkg.zip",
                               default_dir = "~/Downloads",
                               port = 4567L,
                               baseurl = ldm_db_download_url(),
@@ -131,27 +133,33 @@ ldm_data_dir <- function() {
   webElem <- remDr$findElement("id", "btnDownloadSpatialGeoPackageFile")
   webElem$clickElement()
 
-  orig_file_name <- list.files(target_dir, basename)
-  orig_dfile_name <- list.files(default_dir, basename)
+  orig_file_name <- list.files(target_dir, dlname)
+  orig_dfile_name <- list.files(default_dir, dlname)
   ncycle <- 0
   file_name <- dfile_name <- character()
 
   # wait for downloaded file to appear in browser download directory
   while (length(file_name) <= length(orig_file_name) &
          length(dfile_name) <= length(orig_dfile_name)) {
-    file_name <- list.files(target_dir, basename, full.names = TRUE)
-    dfile_name <- list.files(default_dir, basename, full.names = TRUE)
+    file_name <- list.files(target_dir, dlname, full.names = TRUE)
+    dfile_name <- list.files(default_dir, dlname, full.names = TRUE)
     if (length(dfile_name) > 0 || length(file_name) > 0) {
       if ((!is.na(dfile_name[1]) && file.size(dfile_name[1]) > 0)
           || (!is.na(file_name[1]) && file.size(file_name[1]) > 0)) {
-        break;
+        break
+      } else {
+        if (ncycle %% 60 == 0) {
+          print(ncycle)
+        }
       }
     }
     Sys.sleep(1)
     ncycle <- ncycle + 1
     # print(ncycle)
-    if (ncycle > 600)
+    if (ncycle > 1200) {
+      print("Timed out")
       break
+    }
   }
 
   # allow download to default directory, just move to target first

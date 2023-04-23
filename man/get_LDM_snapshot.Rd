@@ -10,7 +10,8 @@ get_LDM_snapshot(
   ...,
   cache = TRUE,
   companion = "LDMCompanion.gpkg",
-  basename = "ncss_labdatagpkg.zip",
+  dlname = "ncss_labdatagpkg.zip",
+  dbname = "ncss_labdata.gpkg",
   cachename = "cached-LDM-SPC.rds",
   dirname = tools::R_user_dir(package = "labtaxa"),
   default_dir = "~/Downloads",
@@ -29,7 +30,9 @@ ldm_data_dir()
 
 \item{companion}{File name to use for companion morphologic database. Default: \code{"LDMCompanion.zip"}}
 
-\item{basename}{Default: \code{"ncss_labdatagpkg.zip"}}
+\item{dlname}{Default: \code{"ncss_labdatagpkg.zip"}}
+
+\item{dbname}{Default: \code{"ncss_labdata.gpkg"}}
 
 \item{cachename}{File name to use for cache RDS file containing SoilProfileCollection of combined LDM snapshots. Default: \verb{"cached-LDM-SPC.rds",}}
 

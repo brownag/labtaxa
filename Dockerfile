@@ -23,7 +23,7 @@ RUN apt-get update \
     libsqlite3-dev \
     libfribidi-dev \
     libudunits2-dev \
-    default-jre \ 
+    default-jre \
     default-jdk \
     libcurl4-openssl-dev \
     wget \
@@ -53,5 +53,7 @@ RUN install2.r --error \
     rprojroot
 
 COPY misc/install.R /home/rstudio/
+
+RUN git clone https://github.com/brownag/labtaxa
 
 RUN Rscript /home/rstudio/install.R
