@@ -24,7 +24,8 @@
 get_LDM_snapshot <- function(...,
                              cache = TRUE,
                              companion = "LDMCompanion.gpkg",
-                             basename = "ncss_labdatagpkg.zip",
+                             dlname = "ncss_labdatagpkg.zip",
+                             dbname = "ncss_labdata.gpkg",
                              cachename = "cached-LDM-SPC.rds",
                              dirname = tools::R_user_dir(package = "labtaxa"),
                              default_dir = "~/Downloads",
@@ -32,7 +33,7 @@ get_LDM_snapshot <- function(...,
                              baseurl = ldm_db_download_url()) {
 
   cp <- file.path(dirname, cachename)
-  fp <- file.path(dirname, basename)
+  fp <- file.path(dirname, dbname)
 
   if (cache && file.exists(cp)) {
     load_labtaxa(cachename, dirname)
@@ -44,7 +45,7 @@ get_LDM_snapshot <- function(...,
     .get_ldm_snapshot(
       port = port,
       dirname = dirname,
-      basename = basename,
+      basename = dlname,
       default_dir = default_dir,
       baseurl = baseurl,
       companion = companion
@@ -53,6 +54,7 @@ get_LDM_snapshot <- function(...,
   }
 
   res <- soilDB::fetchLDM(dsn = fp, chunk.size = 1e7, ...)
+  # TODO: process+join in companion DB
   if (cache) {
     cache_labtaxa(res, filename = cachename, destdir = dirname)
   }
@@ -61,7 +63,7 @@ get_LDM_snapshot <- function(...,
 #' @export
 #' @rdname get_LDM_snapshot
 ldm_db_download_url <- function() {
- "https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx#tabularSpatial"
+ "https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"
 }
 
 #' @export
@@ -115,14 +117,17 @@ ldm_data_dir <- function() {
   res <- try({rD <- RSelenium::rsDriver(browser = "firefox",
                                         chromever = NULL,
                                         extraCapabilities = eCaps,
-                                       port = as.integer(port))})
+                                        port = as.integer(port))})
   stopifnot(!inherits(res, 'try-error'))
 
   remDr <- rD[["client"]]
   remDr$open()
-  on.exit(remDr$close())
+  on.exit(try(remDr$close()))
 
   remDr$navigate(baseurl)
+  # need to click the tab to access the "spatial" lab data downloads
+  tabElem <- remDr$findElement("name" , "tabularSpatial")
+  tabElem$clickElement()
   webElem <- remDr$findElement("id", "btnDownloadSpatialGeoPackageFile")
   webElem$clickElement()
 
@@ -145,20 +150,17 @@ ldm_data_dir <- function() {
     Sys.sleep(1)
     ncycle <- ncycle + 1
     # print(ncycle)
-    if (ncycle > 240)
+    if (ncycle > 600)
       break
   }
 
   # allow download to default directory, just move to target first
   new_dfile_name <- dfile_name[!dfile_name %in% orig_dfile_name]
   file.copy(new_dfile_name, target_dir)
-  # file.remove(new_dfile_name)
+  file.remove(new_dfile_name)
 
-  print(target_dir)
-  print(list.files(target_dir))
-  print(default_dir)
-  print(list.files(default_dir))
-
+  # TODO: should this also be done via RSelenium?
+  # if these files remain on cloudvault/direct download download.file() is easier
   dcompanion <- file.path(target_dir, companion)
   if (nchar(dcompanion) > 0 && !file.exists(dcompanion)) {
     # download companion db
@@ -169,5 +171,5 @@ ldm_data_dir <- function() {
   }
 
   utils::unzip(list.files(target_dir, "zip$", full.names = TRUE), exdir = target_dir)
-
+  remDr$close()
 }
