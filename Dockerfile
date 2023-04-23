@@ -57,3 +57,7 @@ COPY misc/install.R /home/rstudio/
 RUN git clone https://github.com/brownag/labtaxa
 
 RUN Rscript /home/rstudio/install.R
+
+COPY labtaxa/ /home/rstudio/labtaxa/
+
+COPY /root/.local/share/R/labtaxa/ /home/rstudio/.local/share/R/labtaxa/
