@@ -178,6 +178,10 @@ ldm_data_dir <- function() {
     options(timeout = oldtimeout)
   }
 
+  # unzip, remove zipfile
   utils::unzip(list.files(target_dir, "zip$", full.names = TRUE), exdir = target_dir)
-  remDr$close()
+  file.remove(file.path(target_dir, basename(new_dfile_name)))
+
+  # close rselenium
+  try(remDr$close())
 }
