@@ -4,9 +4,12 @@
 # labtaxa
 
 <!-- badges: start -->
-<!-- badges: end -->
 
-## Docker
+[![R-CMD-check](https://github.com/brownag/labtaxa/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/brownag/labtaxa/actions/workflows/R-CMD-check.yaml)
+[![Docker
+Pulls](https://badgen.net/docker/pulls/brownag/labtaxa?icon=docker&label=pulls)](https://hub.docker.com/r/brownag/labtaxa/)
+[![ghcn.io](https://ghcr-badge.egpl.dev/brownag/labtaxa/size)](https://github.com/users/brownag/packages/container/package/labtaxa)
+<!-- badges: end -->
 
 The goal of {labtaxa} is to support automatic download of ‘Lab Data
 Mart’ (<https://ncsslabdatamart.sc.egov.usda.gov/>) database snapshots
@@ -14,6 +17,8 @@ for use in R.
 
 This repository is an R package used for reproducibly obtaining and
 caching the contents of the Lab Data Mart Database.
+
+## Docker
 
 To get up and running quickly, you can use the Docker container. The
 `labtaxa` container is based on
