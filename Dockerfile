@@ -60,4 +60,4 @@ RUN Rscript /home/rstudio/install.R
 
 COPY labtaxa/ /home/rstudio/labtaxa/
 
-COPY /root/.local/share/R/labtaxa/ /home/rstudio/.local/share/R/labtaxa/
+COPY ~/.local/share/R/labtaxa/ /home/rstudio/.local/share/R/labtaxa/
