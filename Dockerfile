@@ -54,4 +54,6 @@ RUN install2.r --error \
 
 COPY misc/install.R /home/rstudio/
 
+RUN git clone https://github.com/brownag/labtaxa
+
 RUN Rscript /home/rstudio/install.R
