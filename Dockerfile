@@ -65,6 +65,7 @@ RUN Rscript /home/rstudio/install.R
 
 COPY --chown=rstudio labtaxa/ /home/rstudio/labtaxa/
 
-RUN cp -r ~/.local/share/R/labtaxa/ ./labtaxa_data
+RUN cp -r ~/.local/share/R/labtaxa/ /home/rstudio/.local/share/R/labtaxa/
+RUN cp -r ~/labtaxa_data/ /home/rstudio/.local/share/R/labtaxa/
+RUN chown rstudio /home/rstudio/.local/share/R/labtaxa/ /home/rstudio/.local/share/R/labtaxa/
 
-COPY --chown=rstudio labtaxa_data/ /home/rstudio/.local/share/R/labtaxa/
