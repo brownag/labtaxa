@@ -60,4 +60,5 @@ RUN Rscript /home/rstudio/install.R
 
 COPY --chown=rstudio --chmod=644 labtaxa/ /home/rstudio/labtaxa/
 
-COPY --chown=rstudio --chmod=644 /root/.local/share/R/labtaxa/ /home/rstudio/.local/share/R/labtaxa/
+WORKDIR /root/.local/share/R/
+COPY --chown=rstudio --chmod=644 labtaxa/ /home/rstudio/.local/share/R/labtaxa/
