@@ -8,6 +8,8 @@
 
 FROM rocker/rstudio:4.2.2
 
+RUN echo $HOME && echo $HOME
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     libxml2 \
@@ -34,6 +36,7 @@ RUN apt-get update \
     libdbus-glib-1-2 \
     libxt6 \
     libpci-dev
+
 RUN wget https://download-installer.cdn.mozilla.net/pub/firefox/releases/109.0/linux-x86_64/en-US/firefox-109.0.tar.bz2
 RUN tar -xjf firefox-*.tar.bz2
 RUN mv firefox /opt
