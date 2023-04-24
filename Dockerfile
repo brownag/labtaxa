@@ -60,6 +60,11 @@ RUN git clone https://github.com/brownag/labtaxa
 
 RUN Rscript /home/rstudio/install.R
 
-RUN cp -r labtaxa/ /home/rstudio/labtaxa/
+RUN mv ~/labtaxa/ /home/rstudio/
 
-RUN cp -r ~/.local/share/R/labtaxa/ /home/rstudio/.local/share/R/labtaxa/
+RUN rm ~/.local/share/R/labtaxa/*.zip
+RUN mkdir /home/rstudio/.local/share/R/
+RUN mv ~/.local/share/R/labtaxa /home/rstudio/.local/share/R/labtaxa
+
+RUN chown -hR rstudio /home/rstudio/labtaxa
+RUN chown -hR rstudio /home/rstudio/.local/share/R/labtaxa
