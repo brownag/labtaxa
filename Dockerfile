@@ -64,7 +64,7 @@ RUN mv ~/labtaxa/ /home/rstudio/
 
 RUN rm ~/.local/share/R/labtaxa/*.zip
 RUN mkdir /home/rstudio/.local/share/R/
-RUN mv ~/.local/share/R/labtaxa /home/rstudio/.local/share/R/labtaxa
+RUN mv ~/.local/share/R/labtaxa /home/rstudio/.local/share/R
 
 RUN chown -hR rstudio /home/rstudio/labtaxa
 RUN chown -hR rstudio /home/rstudio/.local/share/R/labtaxa
