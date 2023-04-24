@@ -6,9 +6,8 @@ remotes::install_local(
 )
 
 library(labtaxa)
-
-x <- ldm_data_dir()
-ldm <- get_LDM_snapshot()
+x <- "labtaxa_data"
+ldm <- get_LDM_snapshot(dirname = x)
 
 message("Snapshot files in ", x, ":")
 message(paste0("\t", list.files(x), "\n"))

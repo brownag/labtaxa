@@ -50,9 +50,7 @@ RUN install2.r --error \
     ggplot2 \
     tidyterra \
     rmarkdown \
-    httr \
-    caTools \
-    rprojroot
+    httr
 
 COPY misc/install.R /home/rstudio/
 
@@ -60,10 +58,6 @@ RUN git clone https://github.com/brownag/labtaxa
 
 RUN Rscript /home/rstudio/install.R
 
-RUN mv labtaxa /home/rstudio/
+COPY --link --chown=rstudio --chmod=644 labtaxa/ /home/rstudio/labtaxa/
 
-RUN mkdir -p /home/rstudio/.local/share/R/
-RUN mv ~/.local/share/R/labtaxa /home/rstudio/.local/share/R
-
-RUN chown -hR rstudio /home/rstudio/labtaxa
-RUN chown -hR rstudio /home/rstudio/.local/share/R/labtaxa
+COPY --link --chown=rstudio --chmod=644 labtaxa_data/ /home/rstudio/.local/share/R/labtaxa/
