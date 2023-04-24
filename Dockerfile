@@ -3,7 +3,7 @@
 
 # docker build -t brownag/labtaxa .
 # docker push brownag/labtaxa:latest
-# docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/ brownag/labtaxa
+# docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/Documents brownag/labtaxa
 # Then open your web browser and navigate to `http://localhost:8787`. The default username is `rstudio` and the default password is `mypassword`.
 
 FROM rocker/rstudio:4.2.2
