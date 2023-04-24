@@ -62,7 +62,7 @@ RUN Rscript /home/rstudio/install.R
 
 RUN mv labtaxa /home/rstudio/
 
-RUN mkdir /home/rstudio/.local/share/R/
+RUN mkdir -p /home/rstudio/.local/share/R/
 RUN mv ~/.local/share/R/labtaxa /home/rstudio/.local/share/R
 
 RUN chown -hR rstudio /home/rstudio/labtaxa
