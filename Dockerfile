@@ -63,8 +63,8 @@ RUN mkdir /root/labtaxa_data
 
 RUN Rscript /home/rstudio/install.R
 
-COPY --chown=rstudio --chmod=644 labtaxa/ /home/rstudio/labtaxa/
+COPY --chown=rstudio labtaxa/ /home/rstudio/labtaxa/
 
-RUN cp -r /root/labtaxa_data ./labtaxa_data
+RUN cp -r ~/.local/share/R/labtaxa/ ./labtaxa_data
 
-COPY --chown=rstudio --chmod=644 labtaxa_data/ /home/rstudio/.local/share/R/labtaxa/
+COPY --chown=rstudio labtaxa_data/ /home/rstudio/.local/share/R/labtaxa/
