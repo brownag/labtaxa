@@ -7,7 +7,7 @@ remotes::install_local(
 
 # use a folder within build context
 library(labtaxa)
-x <- "labtaxa_data"
+x <- "~/labtaxa_data"
 ldm <- get_LDM_snapshot(dirname = x)
 
 message("Snapshot files in ", x, ":")
