@@ -58,6 +58,6 @@ RUN git clone https://github.com/brownag/labtaxa
 
 RUN Rscript /home/rstudio/install.R
 
-COPY --link --chown=rstudio --chmod=644 labtaxa/ /home/rstudio/labtaxa/
+COPY --chown=rstudio --chmod=644 labtaxa/ /home/rstudio/labtaxa/
 
-COPY --link --chown=rstudio --chmod=644 labtaxa_data/ /home/rstudio/.local/share/R/labtaxa/
+COPY --chown=rstudio --chmod=644 labtaxa_data/ /home/rstudio/.local/share/R/labtaxa/
