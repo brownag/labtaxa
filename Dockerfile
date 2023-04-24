@@ -60,5 +60,6 @@ RUN Rscript /home/rstudio/install.R
 
 COPY --chown=rstudio --chmod=644 labtaxa/ /home/rstudio/labtaxa/
 
+FROM builder AS databuild1
 WORKDIR /root/.local/share/R/
-COPY --chown=rstudio --chmod=644 labtaxa/ /home/rstudio/.local/share/R/labtaxa/
+COPY --from=1 --chown=rstudio --chmod=644 labtaxa/ /home/rstudio/.local/share/R/labtaxa/
