@@ -6,7 +6,7 @@
 # docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/ brownag/labtaxa
 # Then open your web browser and navigate to `http://localhost:8787`. The default username is `rstudio` and the default password is `mypassword`.
 
-FROM rocker/rstudio:latest AS builder
+FROM rocker/rstudio:4.2.2
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -62,6 +62,6 @@ RUN Rscript /home/rstudio/install.R
 
 COPY --chown=rstudio --chmod=644 labtaxa/ /home/rstudio/labtaxa/
 
-RUN cp -r /root/labtaxa_data ./
+RUN cp -r /root/labtaxa_data ./labtaxa_data
 
 COPY --chown=rstudio --chmod=644 labtaxa_data/ /home/rstudio/.local/share/R/labtaxa/
