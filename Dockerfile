@@ -63,8 +63,8 @@ RUN mkdir /root/labtaxa_data
 
 RUN Rscript /home/rstudio/install.R
 RUN cp -r ./labtaxa /home/rstudio/labtaxa
-RUN chown rstudio /home/rstudio/labtaxa/ /home/rstudio/labtaxa/
+RUN chown -hR rstudio /home/rstudio/labtaxa/ /home/rstudio/labtaxa/
 RUN cp -r ~/.local/share/R/labtaxa/ /home/rstudio/.local/share/R/labtaxa/
 RUN cp -r ~/labtaxa_data/ /home/rstudio/.local/share/R/labtaxa/
-RUN chown rstudio /home/rstudio/.local/share/R/labtaxa/ /home/rstudio/.local/share/R/labtaxa/
+RUN chown -hR rstudio /home/rstudio/.local/share/R/labtaxa/ /home/rstudio/.local/share/R/labtaxa/
 
