@@ -8,8 +8,6 @@
 
 FROM rocker/rstudio:latest
 
-RUN echo $HOME
-
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     libxml2 \
@@ -60,6 +58,6 @@ RUN mkdir labtaxa_data
 
 RUN Rscript /home/rstudio/install.R
 
-COPY --chown=rstudio --chmod=644 ./labtaxa/ /home/rstudio/labtaxa/
+COPY --chown=rstudio --chmod=644 labtaxa/ /home/rstudio/labtaxa/
 
-COPY --chown=rstudio --chmod=644 ./labtaxa_data/ /home/rstudio/.local/share/R/labtaxa/
+COPY --chown=rstudio --chmod=644 labtaxa_data/ /home/rstudio/.local/share/R/labtaxa/
