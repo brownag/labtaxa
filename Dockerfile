@@ -62,7 +62,6 @@ RUN Rscript /home/rstudio/install.R
 
 RUN mv labtaxa /home/rstudio/
 
-RUN rm ~/.local/share/R/labtaxa/*.zip
 RUN mkdir /home/rstudio/.local/share/R/
 RUN mv ~/.local/share/R/labtaxa /home/rstudio/.local/share/R
 
