@@ -3,12 +3,10 @@
 
 # docker build -t brownag/labtaxa .
 # docker push brownag/labtaxa:latest
-# docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/Documents brownag/labtaxa
+# docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/Documents -e ROOT=TRUE brownag/labtaxa
 # Then open your web browser and navigate to `http://localhost:8787`. The default username is `rstudio` and the default password is `mypassword`.
 
-FROM rocker/rstudio:4.2.2
-
-RUN echo $HOME && echo $HOME
+FROM rocker/rstudio:latest
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -55,16 +53,14 @@ RUN install2.r --error \
 
 COPY misc/install.R /home/rstudio/
 
-RUN echo $HOME
-
 RUN git clone https://github.com/brownag/labtaxa
 
 RUN mkdir /root/labtaxa_data
+RUN mkdir -p /home/rstudio/.local/share/R/labtaxa/
 
 RUN Rscript /home/rstudio/install.R
-RUN cp -r ./labtaxa /home/rstudio/labtaxa
-RUN chown -hR rstudio /home/rstudio/labtaxa/ /home/rstudio/labtaxa/
-RUN mkdir -p /home/rstudio/.local/share/R/labtaxa/
-RUN cp -r ~/labtaxa_data/ /home/rstudio/.local/share/R/labtaxa/
-RUN chown -hR rstudio /home/rstudio/.local/share/R/labtaxa/ /home/rstudio/.local/share/R/labtaxa/
 
+RUN cp -r ./labtaxa /home/rstudio/labtaxa
+RUN cp -r ~/labtaxa_data/* /home/rstudio/.local/share/R/labtaxa/
+
+RUN chown -hR rstudio /home/rstudio /home/rstudio

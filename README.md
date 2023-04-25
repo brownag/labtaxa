@@ -45,7 +45,7 @@ docker pull ghcr.io/brownag/labtaxa:latest
 Once you have a local copy of the `labtaxa` container you can run:
 
 ``` sh
-docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents/:/home/rstudio/HOME -e ROOT=TRUE brownag/labtaxa
+docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/Documents -e ROOT=TRUE brownag/labtaxa
 ```
 
 Then open your web browser and navigate to `http://localhost:8787`. The
