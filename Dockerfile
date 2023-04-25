@@ -51,14 +51,14 @@ RUN install2.r --error \
     rmarkdown \
     httr
 
-COPY misc/install.R /home/rstudio/
+COPY misc/demo.R /home/rstudio/
 
 RUN git clone https://github.com/brownag/labtaxa
 
 RUN mkdir /root/labtaxa_data
 RUN mkdir -p /home/rstudio/.local/share/R/labtaxa/
 
-RUN Rscript /home/rstudio/install.R
+RUN Rscript misc/install.R
 
 RUN cp -r ./labtaxa /home/rstudio/labtaxa
 RUN cp -r ~/labtaxa_data/* /home/rstudio/.local/share/R/labtaxa/
