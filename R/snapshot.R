@@ -98,7 +98,7 @@ ldm_data_dir <- function() {
                               default_dir = "~/Downloads",
                               port = 4567L,
                               baseurl = ldm_db_download_url(),
-                              companion = "LDMCompanion.gpkg") {
+                              companion = "LDMCompanion.zip") {
 
   stopifnot(requireNamespace("RSelenium"))
   target_dir <- dirname
@@ -179,7 +179,8 @@ ldm_data_dir <- function() {
   }
 
   # unzip, remove zipfile
-  utils::unzip(list.files(target_dir, "zip$", full.names = TRUE), exdir = target_dir)
+  zf <- list.files(target_dir, "zip$", full.names = TRUE)
+  utils::unzip(zf, exdir = target_dir)
   file.remove(file.path(target_dir, basename(new_dfile_name)))
 
   # close rselenium
