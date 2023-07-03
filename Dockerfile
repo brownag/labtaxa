@@ -50,7 +50,8 @@ RUN install2.r --error \
     tidyterra \
     rmarkdown \
     httr
-
+    
+COPY misc/install.R /home/rstudio/
 COPY misc/demo.R /home/rstudio/
 
 RUN git clone https://github.com/brownag/labtaxa
