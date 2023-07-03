@@ -71,4 +71,48 @@ ldm <- get_LDM_snapshot()
 ```
 
 Downloaded and derived files will be cached in platform-specific
-directory specified by `ldm_data_dir()`.
+directory specified by `ldm_data_dir()` using `cache_labtaxa()`
+
+In the Docker container the snapshot has already been created and cached
+from the latest data (as of the last time the container was built).
+Updates to the method used to create the cache, as well as scheduled
+(monthly) updates occur.
+
+The cached data help to get off and running quickly analyzing the entire
+KSSL database using the [{aqp}](https://cran.r-project.org/package=aqp)
+R package toolchain.
+
+The lab data are pre-loaded in a large SoilProfileCollection object
+(over 65,000 profiles). In only a few seconds from when you have the
+Docker container loaded, you can be filtering and processing the lab
+data object. Downloading archives of the complete databases can take 10s
+of minutes to a couple hours (depending on internet connection). Only in
+cases where the absolute most recent data are needed would require doing
+a cache update.
+
+The downloaded databases (GeoPackage, SQLite) are queried locally using
+{soilDB} functions `fetchLDM()` and `fetchNASIS()`. The {soilDB}
+functions can take a couple minutes to process on larger databases like
+this, so the container building process front loads these more costly
+processing steps. Querying the data using a method like this essentially
+precedes all analyses. soilDB provides standard aggregation methods that
+produce {aqp} SoilProfileCollections, which provide a convenient data
+structure for working with horizon and site level data associated with
+specific soil profiles.
+
+When you start up {labtaxa} in the Docker container you hwill ave the
+latest database and the first-step data object (as if you ran the
+{soilDB} functions) readily available for post-processing for answering
+specific questions.
+
+``` r
+ldm <- load_labtaxa()
+
+length(ldm)
+#> [1] 65403
+```
+
+If you are running on your own machine you will have to run
+`get_LDM_snapshot()` at least once (as above) before the
+`load_labtaxa()` command works. In future runs you will not need to
+re-download or prepare the data unless you need to update the cache.
