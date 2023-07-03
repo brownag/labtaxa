@@ -2,6 +2,8 @@ name: Publish Docker image
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 6 14 * *'
   push:
     branches: [main, master]
     paths:
