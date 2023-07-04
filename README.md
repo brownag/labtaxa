@@ -100,10 +100,10 @@ produce {aqp} SoilProfileCollections, which provide a convenient data
 structure for working with horizon and site level data associated with
 specific soil profiles.
 
-When you start up {labtaxa} in the Docker container you hwill ave the
+When you start up {labtaxa} in the Docker container you will have the
 latest database and the first-step data object (as if you ran the
 {soilDB} functions) readily available for post-processing for answering
-specific questions.
+specific questions. See demo.R in the container home folder to get started.
 
 ``` r
 ldm <- load_labtaxa()
