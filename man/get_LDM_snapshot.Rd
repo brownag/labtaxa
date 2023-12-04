@@ -16,6 +16,7 @@ get_LDM_snapshot(
   dirname = tools::R_user_dir(package = "labtaxa"),
   default_dir = "~/Downloads",
   port = 4567L,
+  timeout = 1e+05,
   baseurl = ldm_db_download_url()
 )
 
@@ -41,6 +42,8 @@ ldm_data_dir()
 \item{default_dir}{Default directory where RSelenium Gecko (Firefox) downloads files. Default: \code{"~/Downloads"}. Customize as needed.}
 
 \item{port}{Default: \code{4567L}}
+
+\item{timeout}{Default: \code{1e5} seconds}
 
 \item{baseurl}{Default: \code{"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"}}
 }

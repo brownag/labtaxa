@@ -11,6 +11,7 @@
 #' @param cachename File name to use for cache RDS file containing SoilProfileCollection of combined LDM snapshots. Default: `"cached-LDM-SPC.rds",`
 #' @param companion File name to use for companion morphologic database. Default: `"LDMCompanion.zip"`
 #' @param port Default: `4567L`
+#' @param timeout Default: `1e5` seconds
 #' @param baseurl Default: `"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"`
 #' @importFrom soilDB fetchLDM
 #' @importFrom aqp site horizons
@@ -31,6 +32,7 @@ get_LDM_snapshot <- function(...,
                              dirname = tools::R_user_dir(package = "labtaxa"),
                              default_dir = "~/Downloads",
                              port = 4567L,
+                             timeout = 1e5,
                              baseurl = ldm_db_download_url()) {
 
   cp <- file.path(dirname, cachename)
@@ -49,6 +51,7 @@ get_LDM_snapshot <- function(...,
       dlname = dlname,
       default_dir = default_dir,
       baseurl = baseurl,
+      timeout = timeout,
       companion = companion
     )
     .patch_ldm_snapshot(fp)
@@ -98,6 +101,7 @@ ldm_data_dir <- function() {
                               default_dir = "~/Downloads",
                               port = 4567L,
                               baseurl = ldm_db_download_url(),
+                              timeout = 1e5,
                               companion = "LDMCompanion.zip") {
 
   stopifnot(requireNamespace("RSelenium"))
@@ -156,7 +160,7 @@ ldm_data_dir <- function() {
     Sys.sleep(1)
     ncycle <- ncycle + 1
     # print(ncycle)
-    if (ncycle > 1200) {
+    if (ncycle > timeout) {
       print("Timed out")
       break
     }
