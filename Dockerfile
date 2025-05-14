@@ -11,6 +11,7 @@ FROM rocker/rstudio:latest
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     cmake \ 
+    pkg-config \
     libxml2 \
     git \
     build-essential \
