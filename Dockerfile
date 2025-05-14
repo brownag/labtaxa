@@ -46,6 +46,7 @@ RUN install2.r --error \
     Rcpp \
     terra \
     sf \
+    s2 \
     ggplot2 \
     tidyterra \
     rmarkdown \
