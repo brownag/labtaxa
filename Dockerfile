@@ -33,7 +33,8 @@ RUN apt-get update \
     libx11-xcb-dev \
     libdbus-glib-1-2 \
     libxt6 \
-    libpci-dev
+    libpci-dev \ 
+    libabsl-dev
 
 RUN wget https://download-installer.cdn.mozilla.net/pub/firefox/releases/109.0/linux-x86_64/en-US/firefox-109.0.tar.bz2
 RUN tar -xjf firefox-*.tar.bz2
@@ -46,7 +47,6 @@ RUN install2.r --error \
     Rcpp \
     terra \
     sf \
-    s2 \
     ggplot2 \
     tidyterra \
     rmarkdown \
