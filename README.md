@@ -9,7 +9,7 @@
 [![docker-publish](https://github.com/brownag/labtaxa/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/brownag/labtaxa/actions/workflows/docker-publish.yml)
 [![Docker
 Pulls](https://badgen.net/docker/pulls/brownag/labtaxa?icon=docker&label=pulls)](https://hub.docker.com/r/brownag/labtaxa/)
-[![ghcn.io](https://ghcr-badge.egpl.dev/brownag/labtaxa/size)](https://github.com/users/brownag/packages/container/package/labtaxa)
+[![ghcn.io](https://badgen.net/docker/size/brownag/labtaxa?icon=docker&label=size)](https://github.com/users/brownag/packages/container/package/labtaxa)
 <!-- badges: end -->
 
 The goal of {labtaxa} is to provide ‘Lab Data Mart’
