@@ -122,6 +122,7 @@ ldm_data_dir <- function() {
   )
   res <- try({rD <- RSelenium::rsDriver(browser = "firefox",
                                         chromever = NULL,
+                                        phantomver = NULL,
                                         extraCapabilities = eCaps,
                                         port = as.integer(port))})
   stopifnot(!inherits(res, 'try-error'))
