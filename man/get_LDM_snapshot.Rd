@@ -9,10 +9,12 @@
 get_LDM_snapshot(
   ...,
   cache = TRUE,
-  companion = "LDMCompanion.gpkg",
   dlname = "ncss_labdatagpkg.zip",
   dbname = "ncss_labdata.gpkg",
   cachename = "cached-LDM-SPC.rds",
+  companiondlname = "ncss_morphologic.zip",
+  companiondbname = "ncss_morphologic.sqlite",
+  companioncachename = "cached-morph-SPC.rds",
   dirname = tools::R_user_dir(package = "labtaxa"),
   default_dir = "~/Downloads",
   port = 4567L,
@@ -27,19 +29,29 @@ ldm_data_dir()
 \arguments{
 \item{...}{Arguments passed to \code{soilDB::fetchLDM()}}
 
-\item{cache}{Default: \code{TRUE}; store result \code{SoilProfileCollection} object in an RDS file in the \code{labtaxa} user data directory and load it rather than rebuilding on subsequent calls?}
-
-\item{companion}{File name to use for companion morphologic database. Default: \code{"LDMCompanion.zip"}}
+\item{cache}{Default: \code{TRUE}; store result \code{SoilProfileCollection} object in an RDS file in the
+\code{labtaxa} user data directory and load it rather than rebuilding on subsequent calls?}
 
 \item{dlname}{Default: \code{"ncss_labdatagpkg.zip"}}
 
 \item{dbname}{Default: \code{"ncss_labdata.gpkg"}}
 
-\item{cachename}{File name to use for cache RDS file containing SoilProfileCollection of combined LDM snapshots. Default: \verb{"cached-LDM-SPC.rds",}}
+\item{cachename}{File name to use for cache RDS file containing SoilProfileCollection of LDM
+data. Default: \verb{"cached-LDM-SPC.rds",}}
+
+\item{companiondlname}{File name to use for companion morphologic database. Default:
+\code{"ncss_companion.zip"}}
+
+\item{companiondbname}{File name to use for companion morphologic database. Default:
+\code{"ncss_companion.sqlite"}}
+
+\item{companioncachename}{File name to use for cache RDS file containing SoilProfileCollection of
+NASIS morphologic data. Default: \verb{"cached-morph-SPC.rds",}}
 
 \item{dirname}{Data cache diretory for \code{labtaxa} package. Default: \code{tools::R_user_dir(package = "labtaxa")}.}
 
-\item{default_dir}{Default directory where RSelenium Gecko (Firefox) downloads files. Default: \code{"~/Downloads"}. Customize as needed.}
+\item{default_dir}{Default directory where RSelenium Gecko (Firefox) downloads files. Default:
+\code{"~/Downloads"}. Customize as needed.}
 
 \item{port}{Default: \code{4567L}}
 
@@ -51,7 +63,12 @@ ldm_data_dir()
 A SoilProfileCollection
 }
 \description{
-Downloads the SQLite database snapshot from \code{"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"}. Uses RSelenium to navigate the webpage and download the file, which is cached in a \code{tools::R_user_dir(package="labtaxa")}. Lboratory pedon data are retrieved from the local SQLite file using \code{soilDB::fetchLDM()}.
+Downloads the SQLite database snapshot from
+\code{"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"}. Uses RSelenium to navigate
+the webpage and download the file, which is cached in a \code{tools::R_user_dir(package="labtaxa")}.
+Laboratory pedon data are retrieved from the local SQLite file using \code{soilDB::fetchLDM()} and
+cached as RDS. Companion morphologic data are retrieved using \code{soilDB::fetchNASIS()} and cached
+as RDS.
 }
 \examples{
 \dontrun{

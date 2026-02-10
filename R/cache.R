@@ -31,3 +31,12 @@ load_labtaxa <- function(filename = "cached-LDM-SPC.rds",
   try(readRDS(file.path(destdir, filename)), silent = silent)
 }
 
+#' @param silent Suppress error messages? Passed to `try()`. Default `FALSE`
+#' @return `load_labmorph()`: Wrapper function for loading cached morphologic SoilProfileCollection from `"cached-morph-SPC.rds"`
+#' @export
+#' @rdname cache_labtaxa
+load_labmorph <- function(filename = "cached-morph-SPC.rds",
+                          destdir = ldm_data_dir(),
+                          silent = FALSE) {
+  load_labtaxa(filename = filename, destdir = destdir, silent = silent)
+}

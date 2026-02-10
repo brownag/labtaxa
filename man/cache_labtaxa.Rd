@@ -3,6 +3,7 @@
 \name{cache_labtaxa}
 \alias{cache_labtaxa}
 \alias{load_labtaxa}
+\alias{load_labmorph}
 \title{Cache Object}
 \usage{
 cache_labtaxa(
@@ -13,6 +14,12 @@ cache_labtaxa(
 
 load_labtaxa(
   filename = "cached-LDM-SPC.rds",
+  destdir = ldm_data_dir(),
+  silent = FALSE
+)
+
+load_labmorph(
+  filename = "cached-morph-SPC.rds",
   destdir = ldm_data_dir(),
   silent = FALSE
 )
@@ -30,6 +37,8 @@ load_labtaxa(
 \code{cache_labtaxa()}: \code{x} is cached in \code{destdir} as \code{filename} as a side-effect. Invisibly returns the full file path.
 
 \code{load_labtaxa()}: Read a .rds file (\code{filename}) from \code{destdir} (the labtaxa "user data" directory). Returns the object contained in the file, or \code{try-error} on failure to read file.
+
+\code{load_labmorph()}: Wrapper function for loading cached morphologic SoilProfileCollection from \code{"cached-morph-SPC.rds"}
 }
 \description{
 Cache Object

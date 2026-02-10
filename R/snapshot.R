@@ -1,15 +1,29 @@
 #' Get 'Lab Data Mart' 'SQLite' Snapshot
 #'
-#' Downloads the SQLite database snapshot from `"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"`. Uses RSelenium to navigate the webpage and download the file, which is cached in a `tools::R_user_dir(package="labtaxa")`. Lboratory pedon data are retrieved from the local SQLite file using `soilDB::fetchLDM()`.
+#' Downloads the SQLite database snapshot from
+#' `"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"`. Uses RSelenium to navigate
+#' the webpage and download the file, which is cached in a `tools::R_user_dir(package="labtaxa")`.
+#' Laboratory pedon data are retrieved from the local SQLite file using `soilDB::fetchLDM()` and
+#' cached as RDS. Companion morphologic data are retrieved using `soilDB::fetchNASIS()` and cached
+#' as RDS.
 #'
 #' @param ... Arguments passed to `soilDB::fetchLDM()`
-#' @param cache Default: `TRUE`; store result `SoilProfileCollection` object in an RDS file in the `labtaxa` user data directory and load it rather than rebuilding on subsequent calls?
+#' @param cache Default: `TRUE`; store result `SoilProfileCollection` object in an RDS file in the
+#'   `labtaxa` user data directory and load it rather than rebuilding on subsequent calls?
 #' @param dlname Default: `"ncss_labdatagpkg.zip"`
 #' @param dbname Default: `"ncss_labdata.gpkg"`
-#' @param dirname Data cache diretory for `labtaxa` package. Default: `tools::R_user_dir(package = "labtaxa")`.
-#' @param default_dir Default directory where RSelenium Gecko (Firefox) downloads files. Default: `"~/Downloads"`. Customize as needed.
-#' @param cachename File name to use for cache RDS file containing SoilProfileCollection of combined LDM snapshots. Default: `"cached-LDM-SPC.rds",`
-#' @param companion File name to use for companion morphologic database. Default: `"LDMCompanion.zip"`
+#' @param cachename File name to use for cache RDS file containing SoilProfileCollection of LDM
+#'   data. Default: `"cached-LDM-SPC.rds",`
+#' @param companiondlname File name to use for companion morphologic database. Default:
+#'   `"ncss_companion.zip"`
+#' @param companiondbname File name to use for companion morphologic database. Default:
+#'   `"ncss_companion.sqlite"`
+#' @param companioncachename File name to use for cache RDS file containing SoilProfileCollection of
+#'   NASIS morphologic data. Default: `"cached-morph-SPC.rds",`
+#' @param dirname Data cache diretory for `labtaxa` package. Default: `tools::R_user_dir(package =
+#'   "labtaxa")`.
+#' @param default_dir Default directory where RSelenium Gecko (Firefox) downloads files. Default:
+#'   `"~/Downloads"`. Customize as needed.
 #' @param port Default: `4567L`
 #' @param timeout Default: `1e5` seconds
 #' @param baseurl Default: `"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"`
@@ -25,10 +39,12 @@
 #' }
 get_LDM_snapshot <- function(...,
                              cache = TRUE,
-                             companion = "LDMCompanion.gpkg",
                              dlname = "ncss_labdatagpkg.zip",
                              dbname = "ncss_labdata.gpkg",
                              cachename = "cached-LDM-SPC.rds",
+                             companiondlname = "ncss_morphologic.zip",
+                             companiondbname = "ncss_morphologic.sqlite",
+                             companioncachename = "cached-morph-SPC.rds",
                              dirname = tools::R_user_dir(package = "labtaxa"),
                              default_dir = "~/Downloads",
                              port = 4567L,
@@ -37,6 +53,7 @@ get_LDM_snapshot <- function(...,
 
   cp <- file.path(dirname, cachename)
   fp <- file.path(dirname, dbname)
+  mp <- file.path(dirname, companiondbname)
 
   if (cache && file.exists(cp)) {
     load_labtaxa(cachename, dirname)
@@ -52,15 +69,25 @@ get_LDM_snapshot <- function(...,
       default_dir = default_dir,
       baseurl = baseurl,
       timeout = timeout,
-      companion = companion
+      companion = companiondlname
     )
     .patch_ldm_snapshot(fp)
+    .patch_morph_snapshot(mp)
   }
 
+  # create LDM SPC
   res <- soilDB::fetchLDM(dsn = fp, chunk.size = 1e7, ...)
+
+  # create morphologic SPC
+  su <- getOption("soilDB.NASIS.skip_uncode")
+  options(soilDB.NASIS.skip_uncode = TRUE)
+  morph <- soilDB::fetchNASIS(dsn = mp, SS = FALSE)
+  options(soilDB.NASIS.skip_uncode = su)
+
   # TODO: process+join in companion DB
   if (cache) {
     cache_labtaxa(res, filename = cachename, destdir = dirname)
+    cache_labtaxa(morph, filename = companioncachename, destdir = dirname)
   }
 }
 
@@ -86,12 +113,44 @@ ldm_data_dir <- function() {
   lapply(tbls, function(i) {
     if (grepl("_vw$", tbls[i])) {
       try(RSQLite::dbRemoveTable(con, new_view_names[i]))
-      if (RSQLite::dbWriteTable(con, new_view_names[i],
-                                RSQLite::dbReadTable(con, tbls[i]))) {
+      if (RSQLite::dbWriteTable(con, new_view_names[i],RSQLite::dbReadTable(con, tbls[i]))) {
         RSQLite::dbRemoveTable(con, tbls[i])
       }
     }
   })
+}
+
+.patch_morph_snapshot <- function(dsn, ...) {
+
+  # patch companion db
+  con <- soilDB::NASIS(dsn = dsn)
+
+  ## add missing columns
+  # ecologicalsitehistory: recwlupdated
+  # site: stateareaiidref, countyareaiidref, mlraareaiidref
+
+  seh <- DBI::dbGetQuery(con, "SELECT * FROM siteecositehistory")
+  if (is.null(seh$recwlupdated))
+    seh$recwlupdated <- as.POSIXct(0)
+  RSQLite::dbWriteTable(con, "siteecositehistory", seh, overwrite = TRUE)
+
+  sit <- DBI::dbGetQuery(con, "SELECT * FROM site")
+  if (is.null(sit$stateareaiidref))
+    sit$stateareaiidref <- integer(1)
+  if (is.null(sit$countyareaiidref))
+    sit$countyareaiidref <- integer(1)
+  if (is.null(sit$mlraareaiidref))
+    sit$mlraareaiidref <- integer(1)
+  RSQLite::dbWriteTable(con, "site", sit, overwrite = TRUE)
+
+  ## add missing lookup tables
+  tables <- c("othvegclass", "geomorfeattype", "geomorfeat")
+  for (tbl in tables) {
+    x <- readRDS(file.path("inst", "extdata", paste0(tbl, ".rds")))
+    RSQLite::dbWriteTable(con, tbl, x, overwrite = TRUE)
+  }
+
+  DBI::dbDisconnect(con)
 }
 
 #' @importFrom utils download.file unzip
@@ -102,9 +161,10 @@ ldm_data_dir <- function() {
                               port = 4567L,
                               baseurl = ldm_db_download_url(),
                               timeout = 1e5,
-                              companion = "LDMCompanion.zip") {
+                              companion = "ncss_morphologic.sqlite") {
 
   stopifnot(requireNamespace("RSelenium"))
+
   target_dir <- dirname
   if (!dir.exists(target_dir)) {
     dir.create(target_dir, recursive = TRUE)
@@ -179,13 +239,24 @@ ldm_data_dir <- function() {
     # download companion db
     oldtimeout <- getOption("timeout")
     options(timeout = 1e5)
-    utils::download.file("https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download", destfile = dcompanion)
+    utils::download.file(
+      "https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download",
+      destfile = dcompanion,
+      mode = "wb"
+    )
     options(timeout = oldtimeout)
   }
 
   # unzip, remove zipfile
   zf <- list.files(target_dir, "zip$", full.names = TRUE)
   utils::unzip(zf, exdir = target_dir)
+
+  # TODO: generalize this for a future standardized morphologic database internal filename
+  oldfn <- file.path(target_dir, "NASIS_Morphological_09142021.sqlite")
+  if (file.exists(oldfn)) {
+    file.rename(oldfn, file.path(target_dir, companion))
+  }
+
   file.remove(file.path(target_dir, basename(new_dfile_name)))
 
   # close rselenium
