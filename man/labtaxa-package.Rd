@@ -8,4 +8,8 @@
 \description{
 Supports automatic download of 'Lab Data Mart' (\url{https://ncsslabdatamart.sc.egov.usda.gov/}) database snapshots. Applies patches to the cached database for testing and use in R.
 }
+\author{
+\strong{Maintainer}: Andrew Brown \email{andrew.g.brown@usda.gov} (\href{https://orcid.org/0000-0002-4565-533X}{ORCID})
+
+}
 \keyword{internal}
