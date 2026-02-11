@@ -40,7 +40,33 @@ Or from GitHub:
 docker pull ghcr.io/brownag/labtaxa:latest
 ```
 
-Once you have a local copy of the `labtaxa` container you can run:
+### Quick Start with Docker Compose (Recommended)
+
+The easiest way to run the container is with **Docker Compose**. A `docker-compose.yml` file is included in this repository:
+
+``` sh
+# Clone the repository
+git clone https://github.com/brownag/labtaxa.git
+cd labtaxa
+
+# Start the container (downloads image on first run)
+docker-compose up -d
+
+# Stop the container
+docker-compose down
+```
+
+Then open your web browser and navigate to `http://localhost:8787`. The default username is `rstudio` and the default password is `soilscience`.
+
+**Features:**
+- Persistent `projects/` directory for your work
+- Automatic volume management for package cache
+- Pre-configured resource limits (8GB memory, 2 CPUs)
+- Health checks to monitor container status
+
+### Running with Docker Run
+
+Alternatively, you can run the container directly:
 
 ``` sh
 docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/Documents -e ROOT=TRUE brownag/labtaxa
