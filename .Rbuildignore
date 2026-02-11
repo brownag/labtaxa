@@ -4,5 +4,9 @@
 ^\.Rproj\.user$
 ^README\.Rmd$
 ^misc$
+^scratch$
 ^\.github$
 ^Dockerfile$
+^_pkgdown.yml$
+^docker-compose.yml$
+^\..*$

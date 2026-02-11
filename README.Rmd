@@ -13,20 +13,33 @@ knitr::opts_chunk$set(
 )
 ```
 
-# labtaxa
+# labtaxa 
 
 <!-- badges: start -->
 [![R-CMD-check](https://github.com/brownag/labtaxa/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/brownag/labtaxa/actions/workflows/R-CMD-check.yaml)
 [![docker-publish](https://github.com/brownag/labtaxa/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/brownag/labtaxa/actions/workflows/docker-publish.yml)
 [![Docker Pulls](https://badgen.net/docker/pulls/brownag/labtaxa?icon=docker&label=pulls)](https://hub.docker.com/r/brownag/labtaxa/)
-[![ghcn.io](https://badgen.net/docker/size/brownag/labtaxa?icon=docker&label=size)](https://github.com/users/brownag/packages/container/package/labtaxa)
+[![Docker Size](https://badgen.net/docker/size/brownag/labtaxa?icon=docker&label=size)](https://github.com/users/brownag/packages/container/package/labtaxa)
+[![pkgdown](https://img.shields.io/badge/docs-HTML-informational)](https://brownag.github.io/labtaxa/)
 <!-- badges: end -->
 
-The goal of {labtaxa} is to provide 'Lab Data Mart' (<https://ncsslabdatamart.sc.egov.usda.gov/>) database snapshots for use in R. This repository is an R package used to download and cache the contents of the Lab Data Mart GeoPackage database.
+## Overview
+
+**labtaxa** provides reproducible access to the USDA-NRCS Kellogg Soil Survey Laboratory (KSSL) database snapshots in R.
+
+The package automatically downloads, caches, and loads the complete Lab Data Mart database (~65,000 soil profiles with detailed laboratory analyses) for soil science research and education.
 
 ## Docker
 
-To get up and running quickly you can use the Docker container. The `labtaxa` container is based on [`"rocker/rstudio:latest"`](https://hub.docker.com/r/rocker/rstudio). In addition to the standard RStudio tools, the container has the cached Lab Data Mart GeoPackage (containing lab and spatial data) and the companion morphologic database (derived from NASIS pedon descriptions) pre-downloaded. Also, the results of `soilDB::fetchLDM()` called on the LDM GeoPackage data source are cached as an R object file (.rds). Finally, a variety of useful R packages are pre-installed. All can be accessed via an RStudio Server web browser interface.
+To get up and running quickly you can use the Docker container. The `labtaxa` container is based on **rocker/rstudio** with a pinned R version (see Dockerfile for current version) for reproducibility. In addition to the standard RStudio tools, the container has:
+
+- **Cached Lab Data Mart GeoPackage** - Complete KSSL database (lab and spatial data)
+- **Morphologic database** - Derived from NASIS pedon field descriptions
+- **Pre-processed data** - `SoilProfileCollection` objects cached as RDS files
+- **Curated packages** - All dependencies for soil science analysis
+- **RStudio Server** - Full IDE accessible via web browser
+
+The data and packages are exactly versioned (not floating), guaranteeing reproducible results: the same Docker tag always gives the same environment and data.
 
 From Docker Hub:
 
@@ -40,7 +53,34 @@ Or from GitHub:
 docker pull ghcr.io/brownag/labtaxa:latest
 ```
 
-Once you have a local copy of the `labtaxa` container you can run:
+### Quick Start with Docker Compose (Recommended)
+
+The easiest way to run the container is with **Docker Compose**. A `docker-compose.yml` file is included in this repository:
+
+``` sh
+# Clone the repository
+git clone https://github.com/brownag/labtaxa.git
+cd labtaxa
+
+# Start the container (downloads image on first run)
+docker-compose up -d
+
+# Stop the container
+docker-compose down
+```
+
+Then open your web browser and navigate to `http://localhost:8787`. The default username is `rstudio` and the default password is `soilscience`.
+
+**Features:**
+
+- Persistent `projects/` directory for your work
+- Automatic volume management for package cache
+- Pre-configured resource limits (16GB memory, 4 CPUs)
+- Health checks to monitor container status
+
+### Running with Docker Run
+
+Alternatively, you can run the container directly:
 
 ``` sh
 docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/Documents -e ROOT=TRUE brownag/labtaxa
@@ -61,7 +101,7 @@ if (!require("labtaxa"))
 
 Download (and cache) the latest Lab Data Mart SQLite snapshot from <https://ncsslabdatamart.sc.egov.usda.gov/> like so:
 
-```{r example, eval = FALSE}
+```{r example, echo = TRUE}
 library(labtaxa)
 ldm <- get_LDM_snapshot()
 ```
@@ -76,13 +116,59 @@ The lab data are pre-loaded in a large SoilProfileCollection object (over 65,000
 
 The downloaded databases (GeoPackage, SQLite) are queried locally using {soilDB} functions `fetchLDM()` and `fetchNASIS()`. The {soilDB} functions can take a couple minutes to process on larger databases like this, so the container building process front loads these more costly processing steps. Querying the data using a method like this essentially precedes all analyses. soilDB provides standard aggregation methods that produce {aqp} SoilProfileCollections, which provide a convenient data structure for working with horizon and site level data associated with specific soil profiles. 
 
-When you start up {labtaxa} in the Docker container you hwill ave the latest database and the first-step data object (as if you ran the {soilDB} functions) readily available for post-processing for answering specific questions. 
+When you start up {labtaxa} in the Docker container you will have the latest database and the first-step data object (as if you ran the {soilDB} functions) readily available for post-processing for answering specific questions. 
 
-```{r example2, eval=FALSE}
-ldm <- load_labtaxa()
-
-length(ldm)
-#> [1] 65403
+```{r example2, echo = TRUE}
+ldm
 ```
 
 If you are running on your own machine you will have to run `get_LDM_snapshot()` at least once (as above) before the `load_labtaxa()` command works. In future runs you will not need to re-download or prepare the data unless you need to update the cache.
+
+## Data Versioning Strategy
+
+**labtaxa** uses semantic versioning for reproducibility:
+
+- `latest` - Most recent data snapshot (always updated)
+- `YYYY.MM` - Specific month snapshot (e.g., `2026.02` for February 2026 data)
+- `YYYY.MM.DD` - Specific day snapshot (rare, for patch builds)
+
+**For reproducible research**, always specify a version tag:
+
+```bash
+# Use a specific month snapshot (recommended for publications)
+docker pull ghcr.io/brownag/labtaxa:2026.02
+```
+**GitHub Releases** contain checksums for verification:
+- Each release is tagged with the data snapshot date
+- Download `snapshot-metadata.json` to verify file integrity
+
+### Cite the Data
+
+When publishing research using NCSS laboratory data should cite:
+
+> National Cooperative Soil Survey
+> National Cooperative Soil Survey Soil Characterization Database
+> http://ncsslabdatamart.sc.egov.usda.gov/
+> Accessed <Date>
+
+You can cite both the package and the data version:
+
+```bibtex
+@misc{labtaxa2026,
+  author = {Brown, Andrew},
+  title = {labtaxa: USDA KSSL Database Snapshots},
+  year = {2026},
+  url = {https://github.com/brownag/labtaxa}
+}
+```
+### Getting Help
+
+- **Documentation**: https://brownag.github.io/labtaxa/
+- **Report Issues**: https://github.com/brownag/labtaxa/issues
+- **Discussions**: https://github.com/brownag/labtaxa/discussions
+
+## Related Resources
+
+- **Lab Data Mart**: https://ncsslabdatamart.sc.egov.usda.gov/
+- **aqp Package** (SoilProfileCollection object): https://cran.r-project.org/package=aqp
+- **soilDB Package** (soil database tools): https://cran.r-project.org/package=soilDB

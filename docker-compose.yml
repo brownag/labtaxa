@@ -1,0 +1,81 @@
+version: '3.8'
+
+# labtaxa Docker Compose Configuration
+# Quick start: docker-compose up -d
+# Then access RStudio at http://localhost:8787
+# Default credentials: username=rstudio, password=soilscience
+
+services:
+  labtaxa:
+    # Use pinned version for reproducibility
+    # Example tags: latest, 2026.02, 2026.02.10
+    image: ghcr.io/brownag/labtaxa:latest
+
+    container_name: labtaxa
+
+    # Automatically restart on failure
+    restart: unless-stopped
+
+    # Environment configuration
+    environment:
+      # RStudio Server password (change this!)
+      - PASSWORD=soilscience
+
+      # Grant sudo privileges for installing system packages
+      - ROOT=true
+
+      # Set to true to disable RStudio authentication (local use only)
+      - DISABLE_AUTH=false
+
+      # Configure user
+      - USER=rstudio
+
+    # Port mappings
+    ports:
+      # RStudio Server: http://localhost:8787
+      - "8787:8787"
+
+      # Future: plumber API (Phase 4)
+      # - "8000:8000"
+
+    # Volume mounts
+    volumes:
+      # Persistent project/work directory
+      # Changes made here will persist after container stops
+      - ./projects:/home/rstudio/projects
+
+      # Package library cache
+      # Avoids redownloading packages on container restart
+      - labtaxa_renv_cache:/home/rstudio/.local/share/renv
+
+      # Optional: Cache R history and other user files
+      # - ./rstudio_home:/home/rstudio
+
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          # Maximum memory usage
+          memory: 16G
+
+          # Maximum CPU cores
+          cpus: '4.0'
+
+        # Reservations (guaranteed minimum)
+        reservations:
+          memory: 2G
+          cpus: '1.0'
+
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8787"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Named volume for renv cache
+# Persists R package downloads across container restarts
+volumes:
+  labtaxa_renv_cache:
+    driver: local

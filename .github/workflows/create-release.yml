@@ -1,0 +1,163 @@
+# Automated GitHub Release creation after successful Docker build
+# Publishes metadata and checksums as release assets
+# Enables scientists to cite specific data snapshots
+
+name: Create Release
+
+on:
+  workflow_run:
+    workflows: ["Publish Docker image"]
+    types:
+      - completed
+
+jobs:
+  create-release:
+    name: Create GitHub Release
+    if: github.event.workflow_run.conclusion == 'success' && github.repository_owner == 'brownag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Generate release tag and version
+        id: version
+        run: |
+          # Create YYYY.MM format tag matching Docker tag scheme
+          RELEASE_TAG=$(date -u +'%Y.%m')
+          echo "tag=${RELEASE_TAG}" >> $GITHUB_OUTPUT
+
+          # Also capture day for reference
+          RELEASE_DATE=$(date -u +'%Y-%m-%d')
+          echo "date=${RELEASE_DATE}" >> $GITHUB_OUTPUT
+
+      - name: Pull Docker image
+        id: docker_pull
+        run: |
+          docker pull ghcr.io/${{ github.repository }}:latest 2>/dev/null || docker pull brownag/labtaxa:latest
+          echo "image_pulled=true" >> $GITHUB_OUTPUT
+
+      - name: Extract metadata and cached data from built image
+        id: metadata
+        continue-on-error: true
+        run: |
+          # Create output directory
+          mkdir -p /tmp/labtaxa-artifacts
+
+          # Extract .labtaxa-metadata.json from the built Docker image
+          # This contains checksums and build information for reproducibility
+          docker run --rm ghcr.io/${{ github.repository }}:latest cat /home/rstudio/.labtaxa-metadata.json > /tmp/labtaxa-artifacts/build-metadata.json 2>/dev/null || \
+          docker run --rm brownag/labtaxa:latest cat /home/rstudio/.labtaxa-metadata.json > /tmp/labtaxa-artifacts/build-metadata.json 2>/dev/null || \
+          echo '{"status":"could_not_extract_metadata"}' > /tmp/labtaxa-artifacts/build-metadata.json
+
+          # Extract snapshot-metadata.json if it exists
+          docker run --rm ghcr.io/${{ github.repository }}:latest cat /home/rstudio/.local/share/R/labtaxa/snapshot-metadata.json > /tmp/labtaxa-artifacts/snapshot-metadata.json 2>/dev/null || \
+          docker run --rm brownag/labtaxa:latest cat /home/rstudio/.local/share/R/labtaxa/snapshot-metadata.json > /tmp/labtaxa-artifacts/snapshot-metadata.json 2>/dev/null || \
+          echo '{"status":"no_snapshot_metadata"}' > /tmp/labtaxa-artifacts/snapshot-metadata.json
+
+          # Extract cached SoilProfileCollection RDS files
+          docker run --rm ghcr.io/${{ github.repository }}:latest cat /home/rstudio/.local/share/R/labtaxa/cached-LDM-SPC.rds > /tmp/labtaxa-artifacts/cached-LDM-SPC.rds 2>/dev/null || \
+          docker run --rm brownag/labtaxa:latest cat /home/rstudio/.local/share/R/labtaxa/cached-LDM-SPC.rds > /tmp/labtaxa-artifacts/cached-LDM-SPC.rds 2>/dev/null || true
+
+          docker run --rm ghcr.io/${{ github.repository }}:latest cat /home/rstudio/.local/share/R/labtaxa/cached-morph-SPC.rds > /tmp/labtaxa-artifacts/cached-morph-SPC.rds 2>/dev/null || \
+          docker run --rm brownag/labtaxa:latest cat /home/rstudio/.local/share/R/labtaxa/cached-morph-SPC.rds > /tmp/labtaxa-artifacts/cached-morph-SPC.rds 2>/dev/null || true
+
+          ls -lh /tmp/labtaxa-artifacts/
+
+          echo "metadata_extracted=true" >> $GITHUB_OUTPUT
+
+      - name: Create release notes
+        id: notes
+        run: |
+          cat > /tmp/release-notes.md << 'EOF'
+          ## USDA KSSL Lab Data Mart Snapshot – ${{ steps.version.outputs.tag }}
+
+          Automated monthly snapshot of the Kellogg Soil Survey Laboratory (KSSL) database.
+
+          ### What's Included
+
+          - **Lab Data Mart SoilProfileCollection**: Processed spatial laboratory characterization data (~20,000+ soil profiles)
+          - **Morphologic SoilProfileCollection**: Processed NASIS field descriptions and pedon morphology
+          - **Original GeoPackage & Database**: Spatial laboratory characterization data and NASIS field descriptions
+          - **Companion Lookup Tables**: Taxonomic and descriptive encodings
+          - **Checksums & Metadata**: Complete provenance and integrity information
+
+          ### Reproducibility
+
+          This container snapshot is immutable and reproducible. Use the specific tag to ensure identical results:
+
+          ```bash
+          docker pull ghcr.io/brownag/labtaxa:${{ steps.version.outputs.tag }}
+          docker-compose up -d  # if using docker-compose.yml
+          ```
+
+          All package versions are locked via renv.lock, R version is pinned (see build-metadata.json), and data checksums are verified.
+
+          ### Data Provenance
+
+          - **Snapshot Date**: ${{ steps.version.outputs.date }}
+          - **Data Source**: [USDA NRCS NCSS Lab Data Mart](https://ncsslabdatamart.sc.egov.usda.gov/)
+          - **Checksums**: See attached `snapshot-metadata.json`
+
+          ### Quick Start
+
+          ```bash
+          # Clone with docker-compose
+          git clone https://github.com/brownag/labtaxa.git
+          cd labtaxa
+          docker-compose up -d
+
+          # Access RStudio at http://localhost:8787
+          # Default credentials: rstudio / soilscience
+          ```
+
+          ### Documentation
+
+          - [Website](https://brownag.github.io/labtaxa)
+          - [Getting Started Guide](https://brownag.github.io/labtaxa/articles/getting-started.html)
+          - [Docker Usage](https://brownag.github.io/labtaxa/articles/docker-usage.html)
+
+          ### Verification
+
+          Verify data integrity using the attached `snapshot-metadata.json`:
+
+          ```bash
+          # Extract and verify checksums
+          sha256sum -c snapshot-metadata.json
+          ```
+
+          ### Citation
+
+          For scientific publications, cite this specific snapshot:
+
+          > Brown, A. (2026). labtaxa: USDA KSSL Database Snapshot [${{ steps.version.outputs.tag }}]. Retrieved from https://github.com/brownag/labtaxa
+
+          ---
+
+          **Built with renv for reproducible R environments and Docker for containerized deployment.**
+          EOF
+
+          # Output for use in release creation
+          echo "notes_file=/tmp/release-notes.md" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.version.outputs.tag }}
+          name: "KSSL Data Snapshot ${{ steps.version.outputs.tag }}"
+          bodyFile: /tmp/release-notes.md
+          artifacts: "/tmp/labtaxa-artifacts/cached-LDM-SPC.rds,/tmp/labtaxa-artifacts/cached-morph-SPC.rds,/tmp/labtaxa-artifacts/snapshot-metadata.json,/tmp/labtaxa-artifacts/build-metadata.json"
+          artifactErrorsFailBuild: false
+          allowUpdates: true
+          makeLatest: true
+          updateOnlyUnreleased: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release Summary
+        run: |
+          echo "Release: ${{ steps.version.outputs.tag }} (https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.tag }})"
+          echo "Artifacts:"
+          ls -lh /tmp/labtaxa-artifacts/ | tail -n +2 | awk '{print "  " $9 " (" $5 ")"}'

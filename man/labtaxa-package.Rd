@@ -8,4 +8,17 @@
 \description{
 Supports automatic download of 'Lab Data Mart' (\url{https://ncsslabdatamart.sc.egov.usda.gov/}) database snapshots. Applies patches to the cached database for testing and use in R.
 }
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://brownag.github.io/labtaxa}
+  \item \url{https://github.com/brownag/labtaxa}
+  \item Report bugs at \url{https://github.com/brownag/labtaxa/issues}
+}
+
+}
+\author{
+\strong{Maintainer}: Andrew Brown \email{andrew.g.brown@usda.gov} (\href{https://orcid.org/0000-0002-4565-533X}{ORCID})
+
+}
 \keyword{internal}

@@ -1,15 +1,25 @@
 Package: labtaxa
 Type: Package
 Title: Fetch and Process USDA-NRCS-NCSS Lab Data Mart 'SQLite' Snapshot
-Version: 0.0.2
-Author: Andrew Brown
+Version: 0.0.3
+Authors@R: person(given = "Andrew", family = "Brown", 
+                  role = c("aut", "cre"), 
+                  email = "andrew.g.brown@usda.gov", 
+                  comment = c(ORCID="0000-0002-4565-533X"))
 Maintainer: Andrew G. Brown <andrew.g.brown@usda.gov>
 Description: Supports automatic download of 'Lab Data Mart' (<https://ncsslabdatamart.sc.egov.usda.gov/>) database snapshots. Applies patches to the cached database for testing and use in R.
 License: CC0
+URL: https://brownag.github.io/labtaxa, https://github.com/brownag/labtaxa
+BugReports: https://github.com/brownag/labtaxa/issues
 Depends: R (>= 4.1)
-Imports: RSelenium, RSQLite, aqp, soilDB
+Imports: RSelenium, RSQLite, aqp, soilDB, DBI, digest, jsonlite
+Suggests:
+    testthat (>= 3.0.0),
+    covr,
+    plumber,
+    pkgdown
 Encoding: UTF-8
 LazyData: true
 Language: en-US
-RoxygenNote: 7.2.3
+RoxygenNote: 7.3.3
 Roxygen: list(markdown = TRUE)

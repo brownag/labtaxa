@@ -1,0 +1,39 @@
+url: https://brownag.github.io/labtaxa
+
+template:
+  bootstrap: 5
+  bslib:
+    primary: "#2c5aa0"
+    secondary: "#555"
+
+home:
+  title: labtaxa – Reproducible USDA KSSL Data Access
+  description: Download, cache, and analyze USDA-NRCS Lab Data Mart snapshots in R
+
+reference:
+  - title: "Data Acquisition"
+    desc: "Download and cache KSSL snapshots"
+    contents:
+      - get_LDM_snapshot
+      - ldm_db_download_url
+      - ldm_data_dir
+
+  - title: "Data Loading"
+    desc: "Load cached data"
+    contents:
+      - load_labtaxa
+      - load_labmorph
+      - cache_labtaxa
+
+development:
+  mode: auto
+
+navbar:
+  structure:
+    left: [home, reference, articles, news]
+    right: [search, github]
+  components:
+    github:
+      icon: fab fa-github
+      href: https://github.com/brownag/labtaxa
+      aria-label: GitHub

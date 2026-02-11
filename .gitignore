@@ -1,7 +1,13 @@
+scratch/
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
-renv
-renv.lock
-.Rprofile
+# renv - exclude library but include lock file and config
+renv/library/
+renv/local/
+renv/cellar/
+renv/lock/
+renv/python/
+renv/sandbox/
+renv/staging/
