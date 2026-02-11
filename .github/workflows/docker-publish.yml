@@ -2,6 +2,15 @@ name: Publish Docker image
 
 on:
   workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force build even if data unchanged'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
   schedule:
     - cron: '0 6 14 * *'
   push:
@@ -14,8 +23,70 @@ on:
     types: [published]
 
 jobs:
+  check_data_changes:
+    name: Check for data updates
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.compare.outputs.should_build }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Get latest release metadata
+        id: get_metadata
+        continue-on-error: true
+        run: |
+          # Download metadata from latest release
+          DOWNLOAD_URL=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | grep -o 'https://github.com[^"]*snapshot-metadata.json')
+          if [ -n "$DOWNLOAD_URL" ]; then
+            echo "metadata_url=${DOWNLOAD_URL}" >> $GITHUB_OUTPUT
+            curl -s -L "${DOWNLOAD_URL}" -o /tmp/old_metadata.json
+            if [ -f /tmp/old_metadata.json ]; then
+              echo "previous_exists=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "previous_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check data freshness
+        id: compare
+        run: |
+          # Force build on manual trigger or code changes
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ] || [ "${{ github.event_name }}" == "push" ] || [ "${{ github.event_name }}" == "release" ]; then
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "reason=Triggered by code change or manual dispatch" >> $GITHUB_OUTPUT
+          elif [ "${{ github.event_name }}" == "schedule" ]; then
+            # On scheduled runs, check if data has changed
+            if [ "${{ steps.get_metadata.outputs.previous_exists }}" == "true" ]; then
+              # Compare snapshot dates from metadata
+              PREVIOUS_DATE=$(grep -o '"snapshot_date": "[^"]*"' /tmp/old_metadata.json | cut -d'"' -f4 || echo "unknown")
+              CURRENT_DATE=$(date +%Y-%m-%d)
+
+              if [ "$PREVIOUS_DATE" != "$CURRENT_DATE" ]; then
+                echo "should_build=true" >> $GITHUB_OUTPUT
+                echo "reason=Data snapshot date changed from ${PREVIOUS_DATE} to ${CURRENT_DATE}" >> $GITHUB_OUTPUT
+              else
+                echo "should_build=false" >> $GITHUB_OUTPUT
+                echo "reason=Data snapshot date unchanged (${PREVIOUS_DATE}), skipping build" >> $GITHUB_OUTPUT
+              fi
+            else
+              # No previous metadata, build to establish baseline
+              echo "should_build=true" >> $GITHUB_OUTPUT
+              echo "reason=No previous release metadata found, building baseline" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "should_build=true" >> $GITHUB_OUTPUT
+            echo "reason=Unknown trigger, proceeding with build" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Summary
+        run: |
+          echo "Build Decision: ${{ steps.compare.outputs.should_build }}"
+          echo "Reason: ${{ steps.compare.outputs.reason }}"
+
   push_to_registries:
-    if: github.repository_owner == 'brownag'
+    needs: check_data_changes
+    if: (needs.check_data_changes.outputs.should_build == 'true' || github.event.inputs.force_build == 'true') && github.repository_owner == 'brownag'
     name: Push Docker image to multiple registries
     runs-on: ubuntu-latest
     permissions:
