@@ -10,6 +10,7 @@
 #' @param ... Arguments passed to `soilDB::fetchLDM()`
 #' @param cache Default: `TRUE`; store result `SoilProfileCollection` object in an RDS file in the
 #'   `labtaxa` user data directory and load it rather than rebuilding on subsequent calls?
+#' @param verbose Default: `TRUE`; print informative messages about download progress and operations?
 #' @param keep_zip Default: `FALSE`; retain `dlname` and `companiondlname` files after extraction?
 #' @param dlname Default: `"ncss_labdatagpkg.zip"`
 #' @param dbname Default: `"ncss_labdata.gpkg"`
@@ -40,6 +41,7 @@
 #' }
 get_LDM_snapshot <- function(...,
                              cache = TRUE,
+                             verbose = TRUE,
                              keep_zip = FALSE,
                              dlname = "ncss_labdatagpkg.zip",
                              dbname = "ncss_labdata.gpkg",
@@ -64,34 +66,96 @@ get_LDM_snapshot <- function(...,
   stopifnot(requireNamespace("RSQLite"))
 
   if (!file.exists(fp) || !cache) {
-    .get_ldm_snapshot(
-      port = port,
-      dirname = dirname,
-      dlname = dlname,
-      default_dir = default_dir,
-      baseurl = baseurl,
-      timeout = timeout,
-      companion = companiondlname,
-      keep_zip = keep_zip
-    )
+    if (verbose) message("Downloading KSSL Lab Data Mart snapshot...")
+    tryCatch({
+      .get_ldm_snapshot(
+        port = port,
+        dirname = dirname,
+        dlname = dlname,
+        morphdlname = companiondlname,
+        default_dir = default_dir,
+        baseurl = baseurl,
+        timeout = timeout,
+        keep_zip = keep_zip,
+        verbose = verbose
+      )
+    }, error = function(e) {
+      stop(sprintf(
+        "Failed to download snapshot: %s\nPlease check your internet connection and try again.",
+        conditionMessage(e)
+      ), call. = FALSE)
+    })
+  } else {
+    if (verbose) message(sprintf("Using cached database: %s", fp))
   }
-  .patch_ldm_snapshot(fp)
-  .patch_morph_snapshot(mp)
 
-  # create LDM SPC
-  res <- soilDB::fetchLDM(dsn = fp, chunk.size = 1e7, ...)
+  # Patch databases with error handling
+  if (verbose) message("Patching Lab Data Mart database...")
+  tryCatch({
+    .patch_ldm_snapshot(fp)
+  }, error = function(e) {
+    warning(sprintf(
+      "Error patching LDM database: %s\nDatabase may not be fully compatible.",
+      conditionMessage(e)
+    ), call. = FALSE)
+  })
 
-  # create morphologic SPC
-  su <- getOption("soilDB.NASIS.skip_uncode")
-  options(soilDB.NASIS.skip_uncode = TRUE)
-  morph <- soilDB::fetchNASIS(dsn = mp, SS = FALSE)
-  options(soilDB.NASIS.skip_uncode = su)
+  if (file.exists(mp)) {
+    if (verbose) message("Patching morphologic database...")
+    tryCatch({
+      .patch_morph_snapshot(mp)
+    }, error = function(e) {
+      warning(sprintf(
+        "Error patching morphologic database: %s\nMorphologic data may not be available.",
+        conditionMessage(e)
+      ), call. = FALSE)
+    })
+  }
 
-  # TODO: process+join in companion DB
+  # Load LDM data with error handling
+  if (verbose) message("Loading Lab Data Mart data...")
+  res <- tryCatch({
+    soilDB::fetchLDM(dsn = fp, chunk.size = 1e7, ...)
+  }, error = function(e) {
+    stop(sprintf(
+      "Failed to load Lab Data Mart data: %s\nPlease ensure the database is valid.",
+      conditionMessage(e)
+    ), call. = FALSE)
+  })
+
+  if (verbose) message(sprintf("Loaded %d soil profiles", length(res)))
+
+  # Load morphologic data with graceful fallback
+  if (file.exists(mp)) {
+    if (verbose) message("Loading morphologic data...")
+    su <- getOption("soilDB.NASIS.skip_uncode")
+    options(soilDB.NASIS.skip_uncode = TRUE)
+    morph <- tryCatch({
+      soilDB::fetchNASIS(dsn = mp, SS = FALSE)
+    }, error = function(e) {
+      warning(sprintf(
+        "Failed to load morphologic data: %s\nContinuing with LDM data only.",
+        conditionMessage(e)
+      ), call. = FALSE)
+      NULL
+    }, finally = {
+      options(soilDB.NASIS.skip_uncode = su)
+    })
+  } else {
+    morph <- NULL
+    if (verbose) message("Morphologic database not found, continuing with LDM data only")
+  }
+
+  # Cache results
   if (cache) {
+    if (verbose) message("Caching results...")
     cache_labtaxa(res, filename = cachename, destdir = dirname)
-    cache_labtaxa(morph, filename = companioncachename, destdir = dirname)
+    if (!is.null(morph)) {
+      cache_labtaxa(morph, filename = companioncachename, destdir = dirname)
+    }
   }
+
+  invisible(res)
 }
 
 #' @export
@@ -107,6 +171,101 @@ ldm_data_dir <- function() {
   if (!dir.exists(d))
     dir.create(d, recursive = TRUE)
   d
+}
+
+#' Download File with Retry Logic
+#'
+#' Attempts to download a file with automatic retry on failure.
+#' Provides informative error messages and exponential backoff.
+#'
+#' @param url URL to download from
+#' @param destfile Path where file should be saved
+#' @param max_attempts Maximum number of download attempts (default: 3)
+#' @param verbose Print status messages
+#' @return Invisibly returns TRUE on success, raises error on failure
+#' @keywords internal
+#' @noRd
+.download_with_retry <- function(url, destfile, max_attempts = 3, verbose = TRUE) {
+  for (attempt in 1:max_attempts) {
+    result <- tryCatch({
+      if (verbose && attempt > 1) {
+        message(sprintf("Download attempt %d/%d for %s", attempt, max_attempts, basename(destfile)))
+      }
+      utils::download.file(url, destfile, mode = "wb", quiet = !verbose)
+      TRUE
+    }, error = function(e) {
+      if (verbose) {
+        warning(sprintf(
+          "Download attempt %d failed: %s",
+          attempt,
+          conditionMessage(e)
+        ), call. = FALSE)
+      }
+      FALSE
+    })
+
+    if (result) {
+      if (verbose) {
+        message(sprintf("Successfully downloaded %s", basename(destfile)))
+      }
+      return(invisible(TRUE))
+    }
+
+    if (attempt < max_attempts) {
+      wait_time <- 2^attempt
+      if (verbose) {
+        message(sprintf("Retrying in %d seconds...", wait_time))
+      }
+      Sys.sleep(wait_time)
+    }
+  }
+
+  stop(
+    sprintf(
+      "Failed to download %s after %d attempts. Please check the URL and your internet connection.",
+      url,
+      max_attempts
+    ),
+    call. = FALSE
+  )
+}
+
+#' Verify File Checksum
+#'
+#' Validates that a file's SHA256 checksum matches expected value.
+#'
+#' @param filepath Path to file to verify
+#' @param expected_checksum Expected SHA256 hexadecimal string
+#' @param verbose Print status messages
+#' @return TRUE if checksum matches, FALSE otherwise
+#' @keywords internal
+#' @noRd
+.verify_checksum <- function(filepath, expected_checksum, verbose = TRUE) {
+  if (!file.exists(filepath)) {
+    if (verbose) {
+      warning(sprintf("File not found for checksum verification: %s", filepath), call. = FALSE)
+    }
+    return(FALSE)
+  }
+
+  actual_checksum <- .calculate_checksum(filepath)
+
+  if (actual_checksum == expected_checksum) {
+    if (verbose) {
+      message(sprintf("Checksum verified for %s", basename(filepath)))
+    }
+    return(TRUE)
+  } else {
+    if (verbose) {
+      warning(sprintf(
+        "Checksum mismatch for %s\n  Expected: %s\n  Actual: %s",
+        filepath,
+        expected_checksum,
+        actual_checksum
+      ), call. = FALSE)
+    }
+    return(FALSE)
+  }
 }
 
 #' Calculate SHA256 Checksum of a File
@@ -236,25 +395,29 @@ ldm_data_dir <- function() {
 #' @importFrom RSelenium makeFirefoxProfile rsDriver
 .get_ldm_snapshot <- function(dirname = ldm_data_dir(),
                               dlname = "ncss_labdatagpkg.zip",
+                              morphdlname = "ncss_morphologic.zip",
                               keep_zip = FALSE,
                               overwrite = FALSE,
                               default_dir = "~/Downloads",
                               port = 4567L,
                               baseurl = ldm_db_download_url(),
                               timeout = 1e5,
-                              companion = "ncss_morphologic.zip") {
+                              verbose = TRUE) {
 
   stopifnot(requireNamespace("RSelenium"))
 
   target_dir <- dirname
   if (!dir.exists(target_dir)) {
+    if (verbose) message(sprintf("Creating data directory: %s", target_dir))
     dir.create(target_dir, recursive = TRUE)
   }
 
   if (!dir.exists(default_dir)) {
+    if (verbose) message(sprintf("Creating downloads directory: %s", default_dir))
     dir.create(default_dir, recursive = TRUE)
   }
 
+  # Create Firefox profile for headless download
   fprof <- RSelenium::makeFirefoxProfile(list(
     browser.download.dir = normalizePath(target_dir),
     browser.download.folderList = 2
@@ -263,16 +426,31 @@ ldm_data_dir <- function() {
     firefox_profile = fprof$firefox_profile,
     "moz:firefoxOptions" = list(args = list('--headless'))
   )
-  res <- try({
-    rD <- RSelenium::rsDriver(
+
+  # Initialize Selenium with informative error handling
+  if (verbose) message("Starting Selenium WebDriver (Firefox)...")
+  rD <- tryCatch({
+    RSelenium::rsDriver(
       browser = "firefox",
       chromever = NULL,
       phantomver = NULL,
       extraCapabilities = eCaps,
       port = as.integer(port)
     )
+  }, error = function(e) {
+    stop(
+      sprintf(
+        "Failed to start Selenium WebDriver. This typically means:\n",
+        "1. Firefox is not installed (install with: apt-get install firefox)\n",
+        "2. geckodriver is not available\n",
+        "3. Port %d is already in use\n",
+        "Technical error: %s",
+        port,
+        conditionMessage(e)
+      ),
+      call. = FALSE
+    )
   })
-  stopifnot(!inherits(res, 'try-error'))
 
   remDr <- rD[["client"]]
   remDr$open()
@@ -329,19 +507,30 @@ ldm_data_dir <- function() {
     file.remove(new_dfile_name)
   }
 
-  # TODO: should this also be done via RSelenium?
-  # if these files remain on cloudvault/direct download download.file() is easier
-  dcompanion <- file.path(target_dir, companion)
+  # Download companion morphologic database with retry logic
+  dcompanion <- file.path(target_dir, morphdlname)
   if (nchar(dcompanion) > 0 && !file.exists(dcompanion)) {
-    # download companion db
+    if (verbose) message("Downloading companion morphologic database...")
     oldtimeout <- getOption("timeout")
     options(timeout = 1e5)
-    utils::download.file(
-      "https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download",
-      destfile = dcompanion,
-      mode = "wb"
-    )
-    options(timeout = oldtimeout)
+    tryCatch({
+      .download_with_retry(
+        "https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download",
+        destfile = dcompanion,
+        verbose = verbose
+      )
+    }, error = function(e) {
+      warning(
+        sprintf(
+          "Could not download companion morphologic database. %s\n",
+          "You can continue with LDM data only.",
+          conditionMessage(e)
+        ),
+        call. = FALSE
+      )
+    }, finally = {
+      options(timeout = oldtimeout)
+    })
   }
 
   zf <- list.files(target_dir, "zip$", full.names = TRUE)
@@ -350,7 +539,7 @@ ldm_data_dir <- function() {
   # TODO: generalize this for a future standardized morphologic database internal filename
   oldfn <- file.path(target_dir, "NASIS_Morphological_09142021.sqlite")
   if (file.exists(oldfn)) {
-    file.rename(oldfn, file.path(target_dir, companion))
+    file.rename(oldfn, file.path(target_dir, morphdlname))
   }
 
   if (isFALSE(keep_zip)) {
@@ -360,7 +549,7 @@ ldm_data_dir <- function() {
   # Generate metadata with checksums for reproducibility
   data_files <- c(
     file.path(target_dir, gsub("\\.zip$", ".gpkg", dlname)),
-    file.path(target_dir, companiondbname)
+    file.path(target_dir, gsub("\\.zip$", ".gpkg", morphdlname))
   )
   .write_snapshot_metadata(target_dir, data_files)
 
