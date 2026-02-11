@@ -13,6 +13,11 @@ URL: https://brownag.github.io/labtaxa, https://github.com/brownag/labtaxa
 BugReports: https://github.com/brownag/labtaxa/issues
 Depends: R (>= 4.1)
 Imports: RSelenium, RSQLite, aqp, soilDB, DBI, digest, jsonlite
+Suggests:
+    testthat (>= 3.0.0),
+    covr,
+    plumber,
+    pkgdown
 Encoding: UTF-8
 LazyData: true
 Language: en-US

@@ -94,7 +94,7 @@ jobs:
           docker-compose up -d  # if using docker-compose.yml
           ```
 
-          All package versions are locked via renv.lock, R version is pinned (4.5.2), and data checksums are verified.
+          All package versions are locked via renv.lock, R version is pinned (see build-metadata.json), and data checksums are verified.
 
           ### Data Provenance
 

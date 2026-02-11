@@ -6,7 +6,10 @@
 # docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/Documents -e ROOT=TRUE brownag/labtaxa
 # Then open your web browser and navigate to `http://localhost:8787`. The default username is `rstudio` and the default password is `mypassword`.
 
-FROM rocker/rstudio:4.5.2
+# R version: Update this when new R releases are available
+ARG R_VERSION=4.5.2
+
+FROM rocker/rstudio:${R_VERSION}
 
 # Build arguments for versioning and metadata
 ARG BUILD_DATE
@@ -104,8 +107,8 @@ RUN mkdir -p /home/rstudio && \
     echo "{ \
       \"build_date\": \"${BUILD_DATE}\", \
       \"data_version\": \"${DATA_VERSION}\", \
-      \"r_version\": \"4.5.2\", \
-      \"rocker_base\": \"rocker/rstudio:4.5.2\", \
+      \"r_version\": \"${R_VERSION}\", \
+      \"rocker_base\": \"rocker/rstudio:${R_VERSION}\", \
       \"package_version\": \"${VERSION}\" \
     }" > /home/rstudio/.labtaxa-metadata.json && \
     cat /home/rstudio/.labtaxa-metadata.json
