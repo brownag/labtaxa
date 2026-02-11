@@ -109,6 +109,80 @@ ldm_data_dir <- function() {
   d
 }
 
+#' Calculate SHA256 Checksum of a File
+#'
+#' Computes the SHA256 cryptographic hash of a file for integrity verification.
+#'
+#' @param filepath Path to the file to hash
+#' @return Character string containing the hexadecimal SHA256 digest
+#' @keywords internal
+#' @noRd
+.calculate_checksum <- function(filepath) {
+  if (!file.exists(filepath)) {
+    stop("File not found: ", filepath, call. = FALSE)
+  }
+  digest::digest(file = filepath, algo = "sha256")
+}
+
+#' Write Snapshot Metadata JSON
+#'
+#' Creates a JSON metadata file documenting the downloaded database snapshot,
+#' including checksums, timestamps, and version information for reproducibility.
+#'
+#' @param dirname Directory where metadata will be written
+#' @param data_files Character vector of file paths to hash
+#' @param metadata_file Name of output metadata file
+#'
+#' @details
+#' The metadata JSON contains:
+#' - `snapshot_date`: Date of data snapshot
+#' - `download_timestamp`: When the data was downloaded
+#' - `r_version`: R version used
+#' - `package_version`: labtaxa package version
+#' - `checksums`: SHA256 hash and file size for each data file
+#'
+#' @return Invisibly returns the metadata list (for testing)
+#' @keywords internal
+#' @noRd
+.write_snapshot_metadata <- function(dirname,
+                                     data_files,
+                                     metadata_file = "snapshot-metadata.json") {
+  # Build metadata structure
+  metadata <- list(
+    snapshot_date = as.character(Sys.Date()),
+    download_timestamp = as.character(Sys.time()),
+    r_version = paste(R.version$major, R.version$minor, sep = "."),
+    package_version = as.character(utils::packageVersion("labtaxa")),
+    checksums = lapply(data_files, function(f) {
+      if (file.exists(f)) {
+        list(
+          file = basename(f),
+          sha256 = .calculate_checksum(f),
+          size_bytes = file.size(f)
+        )
+      } else {
+        list(
+          file = basename(f),
+          sha256 = "NOT_FOUND",
+          size_bytes = NA_integer_
+        )
+      }
+    })
+  )
+
+  # Write to JSON file
+  metadata_path <- file.path(dirname, metadata_file)
+  jsonlite::write_json(
+    metadata,
+    path = metadata_path,
+    auto_unbox = TRUE,
+    pretty = TRUE
+  )
+
+  message(sprintf("Metadata written to: %s", metadata_path))
+  invisible(metadata)
+}
+
 .patch_ldm_snapshot <- function(dsn, ...) {
   con <- RSQLite::dbConnect(RSQLite::SQLite(), dsn, ...)
   tbls <- RSQLite::dbListTables(con)
@@ -282,6 +356,13 @@ ldm_data_dir <- function() {
   if (isFALSE(keep_zip)) {
     file.remove(zf)
   }
+
+  # Generate metadata with checksums for reproducibility
+  data_files <- c(
+    file.path(target_dir, gsub("\\.zip$", ".gpkg", dlname)),
+    file.path(target_dir, companiondbname)
+  )
+  .write_snapshot_metadata(target_dir, data_files)
 
   # close rselenium
   try(remDr$close())
