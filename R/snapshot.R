@@ -10,6 +10,7 @@
 #' @param ... Arguments passed to `soilDB::fetchLDM()`
 #' @param cache Default: `TRUE`; store result `SoilProfileCollection` object in an RDS file in the
 #'   `labtaxa` user data directory and load it rather than rebuilding on subsequent calls?
+#' @param keep_zip Default: `FALSE`; retain `dlname` and `companiondlname` files after extraction?
 #' @param dlname Default: `"ncss_labdatagpkg.zip"`
 #' @param dbname Default: `"ncss_labdata.gpkg"`
 #' @param cachename File name to use for cache RDS file containing SoilProfileCollection of LDM
@@ -39,6 +40,7 @@
 #' }
 get_LDM_snapshot <- function(...,
                              cache = TRUE,
+                             keep_zip = FALSE,
                              dlname = "ncss_labdatagpkg.zip",
                              dbname = "ncss_labdata.gpkg",
                              cachename = "cached-LDM-SPC.rds",
@@ -69,11 +71,12 @@ get_LDM_snapshot <- function(...,
       default_dir = default_dir,
       baseurl = baseurl,
       timeout = timeout,
-      companion = companiondlname
+      companion = companiondlname,
+      keep_zip = keep_zip
     )
-    .patch_ldm_snapshot(fp)
-    .patch_morph_snapshot(mp)
   }
+  .patch_ldm_snapshot(fp)
+  .patch_morph_snapshot(mp)
 
   # create LDM SPC
   res <- soilDB::fetchLDM(dsn = fp, chunk.size = 1e7, ...)
@@ -113,7 +116,7 @@ ldm_data_dir <- function() {
   lapply(tbls, function(i) {
     if (grepl("_vw$", tbls[i])) {
       try(RSQLite::dbRemoveTable(con, new_view_names[i]))
-      if (RSQLite::dbWriteTable(con, new_view_names[i],RSQLite::dbReadTable(con, tbls[i]))) {
+      if (RSQLite::dbWriteTable(con, new_view_names[i], RSQLite::dbReadTable(con, tbls[i]))) {
         RSQLite::dbRemoveTable(con, tbls[i])
       }
     }
@@ -146,8 +149,10 @@ ldm_data_dir <- function() {
   ## add missing lookup tables
   tables <- c("othvegclass", "geomorfeattype", "geomorfeat")
   for (tbl in tables) {
-    x <- readRDS(file.path("inst", "extdata", paste0(tbl, ".rds")))
-    RSQLite::dbWriteTable(con, tbl, x, overwrite = TRUE)
+    if (!tbl %in% RSQLite::dbListTables(con)) {
+      x <- readRDS(file.path("inst", "extdata", paste0(tbl, ".rds")))
+      RSQLite::dbWriteTable(con, tbl, x, overwrite = TRUE)
+    }
   }
 
   DBI::dbDisconnect(con)
@@ -157,11 +162,13 @@ ldm_data_dir <- function() {
 #' @importFrom RSelenium makeFirefoxProfile rsDriver
 .get_ldm_snapshot <- function(dirname = ldm_data_dir(),
                               dlname = "ncss_labdatagpkg.zip",
+                              keep_zip = FALSE,
+                              overwrite = FALSE,
                               default_dir = "~/Downloads",
                               port = 4567L,
                               baseurl = ldm_db_download_url(),
                               timeout = 1e5,
-                              companion = "ncss_morphologic.sqlite") {
+                              companion = "ncss_morphologic.zip") {
 
   stopifnot(requireNamespace("RSelenium"))
 
@@ -174,63 +181,79 @@ ldm_data_dir <- function() {
     dir.create(default_dir, recursive = TRUE)
   }
 
-  fprof <- RSelenium::makeFirefoxProfile(list(browser.download.dir = normalizePath(target_dir),
-                                              browser.download.folderList = 2))
+  fprof <- RSelenium::makeFirefoxProfile(list(
+    browser.download.dir = normalizePath(target_dir),
+    browser.download.folderList = 2
+  ))
   eCaps <- list(
     firefox_profile = fprof$firefox_profile,
     "moz:firefoxOptions" = list(args = list('--headless'))
   )
-  res <- try({rD <- RSelenium::rsDriver(browser = "firefox",
-                                        chromever = NULL,
-                                        phantomver = NULL,
-                                        extraCapabilities = eCaps,
-                                        port = as.integer(port))})
+  res <- try({
+    rD <- RSelenium::rsDriver(
+      browser = "firefox",
+      chromever = NULL,
+      phantomver = NULL,
+      extraCapabilities = eCaps,
+      port = as.integer(port)
+    )
+  })
   stopifnot(!inherits(res, 'try-error'))
 
   remDr <- rD[["client"]]
   remDr$open()
   on.exit(try(remDr$close()))
 
-  remDr$navigate(baseurl)
-  # need to click the tab to access the "spatial" lab data downloads
-  tabElem <- remDr$findElement("name" , "tabularSpatial")
-  tabElem$clickElement()
-  webElem <- remDr$findElement("id", "btnDownloadSpatialGeoPackageFile")
-  webElem$clickElement()
-
   orig_file_name <- list.files(target_dir, dlname)
   orig_dfile_name <- list.files(default_dir, dlname)
-  ncycle <- 0
-  file_name <- dfile_name <- character()
 
-  # wait for downloaded file to appear in browser download directory
-  while (length(file_name) <= length(orig_file_name) &
-         length(dfile_name) <= length(orig_dfile_name)) {
-    file_name <- list.files(target_dir, dlname, full.names = TRUE)
-    dfile_name <- list.files(default_dir, dlname, full.names = TRUE)
-    if (length(dfile_name) > 0 || length(file_name) > 0) {
-      if ((!is.na(dfile_name[1]) && file.size(dfile_name[1]) > 0)
-          || (!is.na(file_name[1]) && file.size(file_name[1]) > 0)) {
-        break
-      } else {
-        if (ncycle %% 60 == 0) {
-          print(ncycle)
+  if (overwrite ||
+      (!dlname %in% orig_file_name && !dlname %in% orig_dfile_name)) {
+
+    remDr$navigate(baseurl)
+
+        # need to click the tab to access the "spatial" lab data downloads
+    tabElem <- remDr$findElement("name" , "tabularSpatial")
+    tabElem$clickElement()
+    webElem <- remDr$findElement("id", "btnDownloadSpatialGeoPackageFile")
+    webElem$clickElement()
+
+    ncycle <- 0
+    file_name <- dfile_name <- character()
+
+    # wait for downloaded file to appear in browser download directory
+    while (length(file_name) <= length(orig_file_name) &
+           length(dfile_name) <= length(orig_dfile_name)) {
+      file_name <- list.files(target_dir, dlname, full.names = TRUE)
+      dfile_name <- list.files(default_dir, dlname, full.names = TRUE)
+      if (length(dfile_name) > 0 || length(file_name) > 0) {
+        if ((!is.na(dfile_name[1]) && file.size(dfile_name[1]) > 0)
+            || (!is.na(file_name[1]) && file.size(file_name[1]) > 0)) {
+          break
+        } else {
+          if (ncycle %% 60 == 0) {
+            print(ncycle)
+          }
         }
       }
+      Sys.sleep(1)
+      ncycle <- ncycle + 1
+      # print(ncycle)
+      if (ncycle > timeout) {
+        print("Timed out")
+        break
+      }
     }
-    Sys.sleep(1)
-    ncycle <- ncycle + 1
-    # print(ncycle)
-    if (ncycle > timeout) {
-      print("Timed out")
-      break
-    }
+  } else {
+     dfile_name <- orig_dfile_name
   }
 
   # allow download to default directory, just move to target first
   new_dfile_name <- dfile_name[!dfile_name %in% orig_dfile_name]
-  file.copy(new_dfile_name, target_dir)
-  file.remove(new_dfile_name)
+  if (length(new_dfile_name) > 0) {
+    file.copy(new_dfile_name, target_dir)
+    file.remove(new_dfile_name)
+  }
 
   # TODO: should this also be done via RSelenium?
   # if these files remain on cloudvault/direct download download.file() is easier
@@ -247,9 +270,8 @@ ldm_data_dir <- function() {
     options(timeout = oldtimeout)
   }
 
-  # unzip, remove zipfile
   zf <- list.files(target_dir, "zip$", full.names = TRUE)
-  utils::unzip(zf, exdir = target_dir)
+  sapply(zf, function(z) utils::unzip(z, exdir = target_dir))
 
   # TODO: generalize this for a future standardized morphologic database internal filename
   oldfn <- file.path(target_dir, "NASIS_Morphological_09142021.sqlite")
@@ -257,7 +279,9 @@ ldm_data_dir <- function() {
     file.rename(oldfn, file.path(target_dir, companion))
   }
 
-  file.remove(file.path(target_dir, basename(new_dfile_name)))
+  if (isFALSE(keep_zip)) {
+    file.remove(zf)
+  }
 
   # close rselenium
   try(remDr$close())
