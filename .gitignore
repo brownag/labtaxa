@@ -1,3 +1,4 @@
+scratch/
 .Rproj.user
 .Rhistory
 .RData
@@ -10,5 +11,3 @@ renv/lock/
 renv/python/
 renv/sandbox/
 renv/staging/
-# Keep .Rprofile local only (user-specific)
-.Rprofile
