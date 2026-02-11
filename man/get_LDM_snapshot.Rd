@@ -9,6 +9,8 @@
 get_LDM_snapshot(
   ...,
   cache = TRUE,
+  verbose = TRUE,
+  keep_zip = FALSE,
   dlname = "ncss_labdatagpkg.zip",
   dbname = "ncss_labdata.gpkg",
   cachename = "cached-LDM-SPC.rds",
@@ -27,51 +29,159 @@ ldm_db_download_url()
 ldm_data_dir()
 }
 \arguments{
-\item{...}{Arguments passed to \code{soilDB::fetchLDM()}}
+\item{...}{Arguments passed to \code{soilDB::fetchLDM()} for controlling data retrieval}
 
-\item{cache}{Default: \code{TRUE}; store result \code{SoilProfileCollection} object in an RDS file in the
-\code{labtaxa} user data directory and load it rather than rebuilding on subsequent calls?}
+\item{cache}{Default: \code{TRUE}; cache the downloaded data as an RDS file and reuse
+on subsequent calls? When \code{FALSE}, forces fresh download and processing.}
 
-\item{dlname}{Default: \code{"ncss_labdatagpkg.zip"}}
+\item{verbose}{Default: \code{TRUE}; print informative progress messages about download,
+processing, and caching operations? Set to \code{FALSE} for silent operation.}
 
-\item{dbname}{Default: \code{"ncss_labdata.gpkg"}}
+\item{keep_zip}{Default: \code{FALSE}; retain the downloaded ZIP archive files after
+extraction? Set to \code{TRUE} to preserve raw downloads for manual inspection.}
 
-\item{cachename}{File name to use for cache RDS file containing SoilProfileCollection of LDM
-data. Default: \verb{"cached-LDM-SPC.rds",}}
+\item{dlname}{Default: \code{"ncss_labdatagpkg.zip"}; file name for the main LDM database download}
 
-\item{companiondlname}{File name to use for companion morphologic database. Default:
-\code{"ncss_companion.zip"}}
+\item{dbname}{Default: \code{"ncss_labdata.gpkg"}; file name for the extracted GeoPackage database}
 
-\item{companiondbname}{File name to use for companion morphologic database. Default:
-\code{"ncss_companion.sqlite"}}
+\item{cachename}{Default: \code{"cached-LDM-SPC.rds"}; file name for the cached LDM \code{SoilProfileCollection}}
 
-\item{companioncachename}{File name to use for cache RDS file containing SoilProfileCollection of
-NASIS morphologic data. Default: \verb{"cached-morph-SPC.rds",}}
+\item{companiondlname}{Default: \code{"ncss_morphologic.zip"}; file name for morphologic data download}
 
-\item{dirname}{Data cache diretory for \code{labtaxa} package. Default: \code{tools::R_user_dir(package = "labtaxa")}.}
+\item{companiondbname}{Default: \code{"ncss_morphologic.sqlite"}; file name for extracted morphologic database}
 
-\item{default_dir}{Default directory where RSelenium Gecko (Firefox) downloads files. Default:
-\code{"~/Downloads"}. Customize as needed.}
+\item{companioncachename}{Default: \code{"cached-morph-SPC.rds"}; file name for cached morphologic \code{SoilProfileCollection}}
 
-\item{port}{Default: \code{4567L}}
+\item{dirname}{Data cache directory for the labtaxa package. Default: \code{tools::R_user_dir(package = "labtaxa")}.
+This directory is created automatically if it doesn't exist.}
 
-\item{timeout}{Default: \code{1e5} seconds}
+\item{default_dir}{Default directory where RSelenium Firefox downloads files before moving to cache.
+Default: \code{"~/Downloads"}. Useful if your default browser download location differs.}
 
-\item{baseurl}{Default: \code{"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"}}
+\item{port}{Default: \code{4567L}; port number for Selenium WebDriver. Change if port is already in use.}
+
+\item{timeout}{Default: \code{1e5} seconds (~27.8 hours); maximum time to wait for file download}
+
+\item{baseurl}{Default: \code{"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"};
+URL of the KSSL Lab Data Mart download page}
 }
 \value{
-A SoilProfileCollection
+A \code{SoilProfileCollection} object (from the \code{aqp} package) containing
+laboratory-analyzed soil profile data. The object has two components:
+\itemize{
+\item \code{site} data: Profile-level attributes (e.g., soil taxonomy, coordinates)
+\item \code{horizons} data: Horizon-level laboratory analyses (e.g., pH, texture, nutrients)
+Use \code{length(x)} to get the number of profiles, \code{site(x)} for site data,
+and \code{horizons(x)} for horizon (layer) data.
+}
+
+Character string containing the URL
+
+Character string containing the absolute path to the cache directory
 }
 \description{
-Downloads the SQLite database snapshot from
-\code{"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"}. Uses RSelenium to navigate
-the webpage and download the file, which is cached in a \code{tools::R_user_dir(package="labtaxa")}.
-Laboratory pedon data are retrieved from the local SQLite file using \code{soilDB::fetchLDM()} and
-cached as RDS. Companion morphologic data are retrieved using \code{soilDB::fetchNASIS()} and cached
-as RDS.
+Downloads the USDA-NRCS Kellogg Soil Survey Laboratory (KSSL) 'Lab Data Mart'
+database snapshot from the official download portal. Uses \code{RSelenium} for
+automated browser control to navigate the webpage and initiate the download,
+which is cached in the user's local data directory for fast subsequent access.
+
+Returns the official USDA-NRCS Kellogg Soil Survey Laboratory
+'Lab Data Mart' download page URL.
+
+Returns the directory where labtaxa caches downloaded data and
+processed results. Creates the directory if it doesn't exist.
 }
+\details{
+Laboratory pedon (soil profile) data are retrieved from the downloaded GeoPackage
+SQLite database using \code{soilDB::fetchLDM()} and cached as an RDS file containing
+a \code{SoilProfileCollection} object. Companion morphologic (field description) data
+are retrieved using \code{soilDB::fetchNASIS()} and cached separately.
+
+This is the official USDA-NRCS webpage from which KSSL database
+snapshots are downloaded. The page uses JavaScript and requires
+browser automation via RSelenium to access.
+
+The cache directory is located at:
+\itemize{
+\item Linux/Mac: \verb{~/.local/share/R/labtaxa}
+\item Windows: \verb{C:\\Users\\USERNAME\\AppData\\Local\\R\\labtaxa}
+}
+
+This follows the XDG Base Directory specification via \code{tools::R_user_dir()}.
+}
+\section{Caching Behavior}{
+
+By default (\code{cache = TRUE}), results are automatically cached as RDS files in
+\code{tools::R_user_dir(package="labtaxa")}. Subsequent calls to \code{get_LDM_snapshot()}
+with \code{cache = TRUE} will load the cached data without re-downloading or
+re-processing. Use \code{cache = FALSE} to force a fresh download and rebuild.
+}
+
+\section{Data Versions}{
+
+KSSL data is versioned by month. Always check the Docker image or metadata
+file to determine which data version you're working with. For reproducible
+research, pin to specific Docker image tags: \code{ghcr.io/brownag/labtaxa:2026.02}
+}
+
+\section{Performance Notes}{
+
+The full KSSL database contains ~65,000 soil profiles with 500,000+ horizons.
+Initial download and processing typically takes 10-30 minutes depending on
+internet speed. Subsequent calls using cached data complete in <1 second.
+}
+
 \examples{
 \dontrun{
-get_LDM_snapshot()
+# Download and cache KSSL data (typically takes 10-30 minutes on first run)
+ldm <- get_LDM_snapshot()
+
+# Check what you downloaded
+length(ldm)  # Number of profiles
+head(site(ldm))  # Site-level attributes
+
+# Subsequent calls are fast (load from cache)
+ldm <- get_LDM_snapshot()  # <1 second!
+
+# Access profile data
+profiles <- site(ldm)
+horizons <- horizons(ldm)
+
+# Subset to specific soil orders
+mollisols <- subset(ldm, SSL_taxorder == "mollisols")
+cat(sprintf("Found \%d mollisols\\\\n", length(mollisols)))
+
+# Force fresh download (skip cache)
+ldm_fresh <- get_LDM_snapshot(cache = FALSE, verbose = TRUE)
+
+# Use with soilDB for custom database queries
+ldm <- get_LDM_snapshot()
+horizons_data <- horizons(ldm)
+mean_clay <- mean(horizons_data$clay_r, na.rm = TRUE)
+cat(sprintf("Mean clay content: \%.1f\%\%\\\\n", mean_clay))
+}
+url <- ldm_db_download_url()
+cat(sprintf("Download from: \%s\\\\n", url))
+cache_dir <- ldm_data_dir()
+cat(sprintf("Data cached at: \%s\\\\n", cache_dir))
+
+# Check what's cached
+files <- list.files(cache_dir)
+cat(sprintf("Cached files:\\\\n\%s\\\\n", paste(files, collapse = "\\\\n")))
+}
+\seealso{
+\itemize{
+\item \code{load_labtaxa()} to load previously cached data (much faster)
+\item \code{load_labmorph()} to load morphologic data from cache
+\item \code{cache_labtaxa()} to manually save results to cache
+\item \code{ldm_data_dir()} to find the data cache directory
+\item \code{soilDB::fetchLDM()} for lower-level database access
+\item \code{aqp::SoilProfileCollection} for manipulating profile data
+}
+
+\itemize{
+\item \code{get_LDM_snapshot()} which downloads data to this directory
+\item \code{load_labtaxa()} which loads cached data from this directory
+\item \code{cache_labtaxa()} to manually save data to this directory
 }
 }

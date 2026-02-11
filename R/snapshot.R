@@ -1,43 +1,102 @@
 #' Get 'Lab Data Mart' 'SQLite' Snapshot
 #'
-#' Downloads the SQLite database snapshot from
-#' `"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"`. Uses RSelenium to navigate
-#' the webpage and download the file, which is cached in a `tools::R_user_dir(package="labtaxa")`.
-#' Laboratory pedon data are retrieved from the local SQLite file using `soilDB::fetchLDM()` and
-#' cached as RDS. Companion morphologic data are retrieved using `soilDB::fetchNASIS()` and cached
-#' as RDS.
+#' Downloads the USDA-NRCS Kellogg Soil Survey Laboratory (KSSL) 'Lab Data Mart'
+#' database snapshot from the official download portal. Uses `RSelenium` for
+#' automated browser control to navigate the webpage and initiate the download,
+#' which is cached in the user's local data directory for fast subsequent access.
 #'
-#' @param ... Arguments passed to `soilDB::fetchLDM()`
-#' @param cache Default: `TRUE`; store result `SoilProfileCollection` object in an RDS file in the
-#'   `labtaxa` user data directory and load it rather than rebuilding on subsequent calls?
-#' @param verbose Default: `TRUE`; print informative messages about download progress and operations?
-#' @param keep_zip Default: `FALSE`; retain `dlname` and `companiondlname` files after extraction?
-#' @param dlname Default: `"ncss_labdatagpkg.zip"`
-#' @param dbname Default: `"ncss_labdata.gpkg"`
-#' @param cachename File name to use for cache RDS file containing SoilProfileCollection of LDM
-#'   data. Default: `"cached-LDM-SPC.rds",`
-#' @param companiondlname File name to use for companion morphologic database. Default:
-#'   `"ncss_companion.zip"`
-#' @param companiondbname File name to use for companion morphologic database. Default:
-#'   `"ncss_companion.sqlite"`
-#' @param companioncachename File name to use for cache RDS file containing SoilProfileCollection of
-#'   NASIS morphologic data. Default: `"cached-morph-SPC.rds",`
-#' @param dirname Data cache diretory for `labtaxa` package. Default: `tools::R_user_dir(package =
-#'   "labtaxa")`.
-#' @param default_dir Default directory where RSelenium Gecko (Firefox) downloads files. Default:
-#'   `"~/Downloads"`. Customize as needed.
-#' @param port Default: `4567L`
-#' @param timeout Default: `1e5` seconds
-#' @param baseurl Default: `"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"`
-#' @importFrom soilDB fetchLDM
+#' Laboratory pedon (soil profile) data are retrieved from the downloaded GeoPackage
+#' SQLite database using `soilDB::fetchLDM()` and cached as an RDS file containing
+#' a `SoilProfileCollection` object. Companion morphologic (field description) data
+#' are retrieved using `soilDB::fetchNASIS()` and cached separately.
+#'
+#' @section Caching Behavior:
+#' By default (`cache = TRUE`), results are automatically cached as RDS files in
+#' `tools::R_user_dir(package="labtaxa")`. Subsequent calls to `get_LDM_snapshot()`
+#' with `cache = TRUE` will load the cached data without re-downloading or
+#' re-processing. Use `cache = FALSE` to force a fresh download and rebuild.
+#'
+#' @section Data Versions:
+#' KSSL data is versioned by month. Always check the Docker image or metadata
+#' file to determine which data version you're working with. For reproducible
+#' research, pin to specific Docker image tags: `ghcr.io/brownag/labtaxa:2026.02`
+#'
+#' @section Performance Notes:
+#' The full KSSL database contains ~65,000 soil profiles with 500,000+ horizons.
+#' Initial download and processing typically takes 10-30 minutes depending on
+#' internet speed. Subsequent calls using cached data complete in <1 second.
+#'
+#' @param ... Arguments passed to `soilDB::fetchLDM()` for controlling data retrieval
+#' @param cache Default: `TRUE`; cache the downloaded data as an RDS file and reuse
+#'   on subsequent calls? When `FALSE`, forces fresh download and processing.
+#' @param verbose Default: `TRUE`; print informative progress messages about download,
+#'   processing, and caching operations? Set to `FALSE` for silent operation.
+#' @param keep_zip Default: `FALSE`; retain the downloaded ZIP archive files after
+#'   extraction? Set to `TRUE` to preserve raw downloads for manual inspection.
+#' @param dlname Default: `"ncss_labdatagpkg.zip"`; file name for the main LDM database download
+#' @param dbname Default: `"ncss_labdata.gpkg"`; file name for the extracted GeoPackage database
+#' @param cachename Default: `"cached-LDM-SPC.rds"`; file name for the cached LDM `SoilProfileCollection`
+#' @param companiondlname Default: `"ncss_morphologic.zip"`; file name for morphologic data download
+#' @param companiondbname Default: `"ncss_morphologic.sqlite"`; file name for extracted morphologic database
+#' @param companioncachename Default: `"cached-morph-SPC.rds"`; file name for cached morphologic `SoilProfileCollection`
+#' @param dirname Data cache directory for the labtaxa package. Default: `tools::R_user_dir(package = "labtaxa")`.
+#'   This directory is created automatically if it doesn't exist.
+#' @param default_dir Default directory where RSelenium Firefox downloads files before moving to cache.
+#'   Default: `"~/Downloads"`. Useful if your default browser download location differs.
+#' @param port Default: `4567L`; port number for Selenium WebDriver. Change if port is already in use.
+#' @param timeout Default: `1e5` seconds (~27.8 hours); maximum time to wait for file download
+#' @param baseurl Default: `"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"`;
+#'   URL of the KSSL Lab Data Mart download page
+#'
+#' @importFrom soilDB fetchLDM fetchNASIS
 #' @importFrom aqp site horizons
 #' @importClassesFrom aqp SoilProfileCollection
-#' @return A SoilProfileCollection
+#'
+#' @return A `SoilProfileCollection` object (from the `aqp` package) containing
+#'   laboratory-analyzed soil profile data. The object has two components:
+#'   - `site` data: Profile-level attributes (e.g., soil taxonomy, coordinates)
+#'   - `horizons` data: Horizon-level laboratory analyses (e.g., pH, texture, nutrients)
+#'   Use `length(x)` to get the number of profiles, `site(x)` for site data,
+#'   and `horizons(x)` for horizon (layer) data.
+#'
+#' @seealso
+#'   - `load_labtaxa()` to load previously cached data (much faster)
+#'   - `load_labmorph()` to load morphologic data from cache
+#'   - `cache_labtaxa()` to manually save results to cache
+#'   - `ldm_data_dir()` to find the data cache directory
+#'   - `soilDB::fetchLDM()` for lower-level database access
+#'   - `aqp::SoilProfileCollection` for manipulating profile data
+#'
 #' @export
 #'
 #' @examples
 #' \dontrun{
-#' get_LDM_snapshot()
+#' # Download and cache KSSL data (typically takes 10-30 minutes on first run)
+#' ldm <- get_LDM_snapshot()
+#'
+#' # Check what you downloaded
+#' length(ldm)  # Number of profiles
+#' head(site(ldm))  # Site-level attributes
+#'
+#' # Subsequent calls are fast (load from cache)
+#' ldm <- get_LDM_snapshot()  # <1 second!
+#'
+#' # Access profile data
+#' profiles <- site(ldm)
+#' horizons <- horizons(ldm)
+#'
+#' # Subset to specific soil orders
+#' mollisols <- subset(ldm, SSL_taxorder == "mollisols")
+#' cat(sprintf("Found %d mollisols\\n", length(mollisols)))
+#'
+#' # Force fresh download (skip cache)
+#' ldm_fresh <- get_LDM_snapshot(cache = FALSE, verbose = TRUE)
+#'
+#' # Use with soilDB for custom database queries
+#' ldm <- get_LDM_snapshot()
+#' horizons_data <- horizons(ldm)
+#' mean_clay <- mean(horizons_data$clay_r, na.rm = TRUE)
+#' cat(sprintf("Mean clay content: %.1f%%\\n", mean_clay))
 #' }
 get_LDM_snapshot <- function(...,
                              cache = TRUE,
@@ -158,14 +217,56 @@ get_LDM_snapshot <- function(...,
   invisible(res)
 }
 
+#' Get KSSL Lab Data Mart Download URL
+#'
+#' Returns the official USDA-NRCS Kellogg Soil Survey Laboratory
+#' 'Lab Data Mart' download page URL.
+#'
+#' @details
+#' This is the official USDA-NRCS webpage from which KSSL database
+#' snapshots are downloaded. The page uses JavaScript and requires
+#' browser automation via RSelenium to access.
+#'
+#' @return Character string containing the URL
 #' @export
 #' @rdname get_LDM_snapshot
+#'
+#' @examples
+#' url <- ldm_db_download_url()
+#' cat(sprintf("Download from: %s\\n", url))
 ldm_db_download_url <- function() {
  "https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"
 }
 
+#' Get labtaxa Data Cache Directory
+#'
+#' Returns the directory where labtaxa caches downloaded data and
+#' processed results. Creates the directory if it doesn't exist.
+#'
+#' @details
+#' The cache directory is located at:
+#' - Linux/Mac: `~/.local/share/R/labtaxa`
+#' - Windows: `C:\Users\USERNAME\AppData\Local\R\labtaxa`
+#'
+#' This follows the XDG Base Directory specification via `tools::R_user_dir()`.
+#'
+#' @return Character string containing the absolute path to the cache directory
+#'
+#' @seealso
+#'   - `get_LDM_snapshot()` which downloads data to this directory
+#'   - `load_labtaxa()` which loads cached data from this directory
+#'   - `cache_labtaxa()` to manually save data to this directory
+#'
 #' @export
 #' @rdname get_LDM_snapshot
+#'
+#' @examples
+#' cache_dir <- ldm_data_dir()
+#' cat(sprintf("Data cached at: %s\\n", cache_dir))
+#'
+#' # Check what's cached
+#' files <- list.files(cache_dir)
+#' cat(sprintf("Cached files:\\n%s\\n", paste(files, collapse = "\\n")))
 ldm_data_dir <- function() {
   d <- tools::R_user_dir(package = "labtaxa")
   if (!dir.exists(d))

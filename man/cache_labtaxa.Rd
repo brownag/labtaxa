@@ -4,7 +4,7 @@
 \alias{cache_labtaxa}
 \alias{load_labtaxa}
 \alias{load_labmorph}
-\title{Cache Object}
+\title{Cache and Load KSSL Data}
 \usage{
 cache_labtaxa(
   x,
@@ -25,29 +25,83 @@ load_labmorph(
 )
 }
 \arguments{
-\item{x}{A \code{SoilProfileCollection} (or other object to cache in \code{labtaxa} directory)}
+\item{x}{A \code{SoilProfileCollection} object (typically from \code{get_LDM_snapshot()})
+or any other object to cache in the labtaxa data directory}
 
-\item{filename}{Default: \code{"cached-LDM-SPC.rds"}}
+\item{filename}{Default: \code{"cached-morph-SPC.rds"}; name of cached morphologic file}
 
-\item{destdir}{Default: \code{tools::R_user_dir(package = "labtaxa")}}
+\item{destdir}{Default: \code{ldm_data_dir()}; directory where file is stored}
 
-\item{silent}{Suppress error messages? Passed to \code{try()}. Default \code{FALSE}}
+\item{silent}{Default: \code{FALSE}; suppress error messages if file doesn't exist?}
 }
 \value{
-\code{cache_labtaxa()}: \code{x} is cached in \code{destdir} as \code{filename} as a side-effect. Invisibly returns the full file path.
+\itemize{
+\item \code{cache_labtaxa()}: Invisibly returns the full path to the saved file.
+Called for its side-effect of saving the object.
+\item \code{load_labtaxa()}: Returns the cached object (typically a \code{SoilProfileCollection}),
+or \code{try-error} if the file doesn't exist or can't be read.
+\item \code{load_labmorph()}: Returns the cached morphologic \code{SoilProfileCollection},
+or \code{try-error} if not found.
+}
 
-\code{load_labtaxa()}: Read a .rds file (\code{filename}) from \code{destdir} (the labtaxa "user data" directory). Returns the object contained in the file, or \code{try-error} on failure to read file.
-
-\code{load_labmorph()}: Wrapper function for loading cached morphologic SoilProfileCollection from \code{"cached-morph-SPC.rds"}
+The cached morphologic \code{SoilProfileCollection}, or \code{try-error} if not found
 }
 \description{
-Cache Object
+Manually save and load cached KSSL Lab Data Mart and morphologic datasets.
+
+Convenience wrapper for loading the cached morphologic (field description)
+\code{SoilProfileCollection} from the companion NASIS database.
 }
+\section{Overview}{
+
+These functions provide explicit control over data caching. In most cases,
+\code{get_LDM_snapshot(..., cache = TRUE)} automatically handles both downloading
+and caching. Use these functions only when you need custom caching behavior
+or want to manually manage cached files.
+}
+
+\section{Cache Directory}{
+
+All cached files are stored in \code{ldm_data_dir()}, typically:
+\itemize{
+\item Linux/Mac: \verb{~/.local/share/R/labtaxa}
+\item Windows: \verb{C:\\Users\\USERNAME\\AppData\\Local\\R\\labtaxa}
+}
+}
+
 \examples{
 \dontrun{
- x <- get_LDM_snapshot()
- cache_labtaxa(x)
- y <- load_labtaxa()
- all(profile_id(x) == profile_id(y))
+# Example 1: Download and cache automatically (recommended)
+ldm <- get_LDM_snapshot(cache = TRUE)  # Auto-caches
+
+# Example 2: Load from cache (very fast)
+ldm <- load_labtaxa()
+
+# Example 3: Manually cache a subset
+mollisols <- subset(ldm, SSL_taxorder == "mollisols")
+cache_labtaxa(mollisols, filename = "mollisols-subset.rds")
+
+# Example 4: Later, load your subset
+mollisols <- load_labtaxa(filename = "mollisols-subset.rds")
+
+# Example 5: Load morphologic data
+morph <- load_labmorph()
+
+# Example 6: Check if cache exists before loading
+cache_file <- file.path(ldm_data_dir(), "cached-LDM-SPC.rds")
+if (file.exists(cache_file)) {
+  ldm <- load_labtaxa()
+} else {
+  ldm <- get_LDM_snapshot()  # Downloads if not cached
 }
+}
+}
+\seealso{
+\itemize{
+\item \code{get_LDM_snapshot()} for automatic download and caching
+\item \code{ldm_data_dir()} to find the cache directory
+\item \code{load_labmorph()} to load morphologic data
+}
+
+\code{load_labtaxa()} for loading the main LDM data
 }
