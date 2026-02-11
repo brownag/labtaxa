@@ -23,6 +23,14 @@ LABEL org.opencontainers.image.url="https://brownag.github.io/labtaxa"
 LABEL org.opencontainers.image.vendor="Andrew Brown"
 LABEL org.opencontainers.image.authors="Andrew Brown <andrew.g.brown@usda.gov>"
 
+# Set up renv for reproducible package management
+ENV RENV_VERSION=1.0.7
+RUN R --slave -e "install.packages('renv', repos='https://cloud.r-project.org/')"
+
+# Configure renv cache location for build optimization
+ENV RENV_PATHS_CACHE=/renv/cache
+RUN mkdir -p /renv/cache
+
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
     cmake \ 
@@ -58,19 +66,24 @@ RUN tar -xjf firefox-*.tar.bz2
 RUN mv firefox /opt
 RUN ln -s /opt/firefox/firefox /usr/local/bin/firefox
 
-RUN install2.r --error \
-    --deps TRUE \
-    devtools \
-    Rcpp \
-    terra \
-    sf \
-    ggplot2 \
-    tidyterra \
-    rmarkdown \
-    httr
-    
+# Copy renv files early to leverage Docker layer caching
+# This allows renv::restore() layer to be cached if renv.lock hasn't changed
+WORKDIR /tmp/labtaxa-renv
+COPY renv.lock renv.lock
+COPY .Rprofile .Rprofile
+COPY renv/activate.R renv/activate.R
+
+# Restore exact package versions from lockfile
+# This replaces the old install2.r approach with reproducible package management
+RUN R --slave -e "renv::restore()" && \
+    rm -rf renv/library renv/staging
+
+# Copy demo and install scripts
 COPY misc/install.R /home/rstudio/
 COPY misc/demo.R /home/rstudio/
+
+# Return to root directory for repository operations
+WORKDIR /
 
 RUN git clone https://github.com/brownag/labtaxa
 
