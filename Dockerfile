@@ -93,6 +93,9 @@ RUN git clone https://github.com/brownag/labtaxa
 RUN mkdir /root/labtaxa_data
 RUN mkdir -p /home/rstudio/.local/share/R/labtaxa/
 
+# Install remotes before running install.R
+RUN R --slave -e "install.packages('remotes')"
+
 RUN Rscript /home/rstudio/install.R
 RUN rm /home/rstudio/install.R
 
