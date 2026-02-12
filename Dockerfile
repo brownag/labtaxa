@@ -1,10 +1,19 @@
+# syntax=docker/dockerfile:1.4
 # Reference: https://aboland.ie/Docker.html
-# Build Steps:
+# Build Steps (requires BuildKit):
 
-# docker build -t brownag/labtaxa .
+# Using docker buildx (recommended):
+# docker buildx build -t brownag/labtaxa .
+
+# Or with standard docker build:
+# DOCKER_BUILDKIT=1 docker build -t brownag/labtaxa .
+
+# Push to registry:
 # docker push brownag/labtaxa:latest
+
+# Run container:
 # docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/Documents -e ROOT=TRUE brownag/labtaxa
-# Then open your web browser and navigate to `http://localhost:8787`. The default username is `rstudio` and the default password is `mypassword`.
+# Then open http://localhost:8787 (username: rstudio, password: mypassword)
 
 # R version: Update this when new R releases are available
 ARG R_VERSION=4.5.2
@@ -66,7 +75,8 @@ RUN apt-get update \
     libdbus-glib-1-2 \
     libxt6 \
     libpci-dev \
-    libabsl-dev
+    libabsl-dev \
+    libsodium-dev
 
 RUN wget https://download-installer.cdn.mozilla.net/pub/firefox/releases/109.0/linux-x86_64/en-US/firefox-109.0.tar.bz2
 RUN tar -xjf firefox-*.tar.bz2
@@ -89,9 +99,11 @@ RUN R --slave -e "renv::restore()" && \
     R --slave -e "renv::clean()" && \
     rm -rf renv/library renv/staging
 
-# Copy demo and install scripts, plus .Rprofile and renv for renv activation
+# Copy modularized build scripts, plus .Rprofile and renv for renv activation
 RUN cp /tmp/labtaxa-renv/renv.lock /home/rstudio/
-COPY misc/install.R /home/rstudio/
+COPY misc/download-ldm.R /home/rstudio/
+COPY misc/download-osd.R /home/rstudio/
+COPY misc/cache-labtaxa.R /home/rstudio/
 COPY misc/demo.R /home/rstudio/
 COPY .Rprofile /home/rstudio/.Rprofile
 COPY renv /home/rstudio/renv
@@ -103,19 +115,29 @@ COPY . ./labtaxa
 RUN mkdir /root/labtaxa_data
 RUN mkdir -p /home/rstudio/.local/share/R/labtaxa/
 
-# Copy labtaxa before running install.R
+# Copy labtaxa before running build scripts
 RUN cp -r /labtaxa /home/rstudio/labtaxa
 
 # Change to /home/rstudio so .Rprofile is found and renv is activated
 WORKDIR /home/rstudio
-RUN R --no-save < /dev/null -e "renv::restore()" && \
-    R --no-save < /dev/null -f install.R
-RUN rm /home/rstudio/install.R
 
-RUN rm -r /labtaxa
-RUN cp -r ~/labtaxa_data/* /home/rstudio/.local/share/R/labtaxa/
-RUN rm -r ~/labtaxa_data
-RUN rm -r ~/Downloads
+# Restore renv environment
+RUN R --no-save < /dev/null -e "renv::restore()"
+
+# Download LDM snapshot (includes morphologic database via get_LDM_snapshot)
+RUN --mount=type=cache,target=/home/rstudio/labtaxa_data \
+    R --no-save < /dev/null -f download-ldm.R
+
+# Download OSD and SC data
+RUN --mount=type=cache,target=/home/rstudio/labtaxa_data \
+    R --no-save < /dev/null -f download-osd.R
+
+# Cache data as SoilProfileCollection objects and install package
+RUN R --no-save < /dev/null -f cache-labtaxa.R
+
+# Clean up (cache mount persists between builds, final image doesn't include it)
+RUN rm -rf /labtaxa && \
+    rm -f /home/rstudio/download-ldm.R /home/rstudio/download-osd.R /home/rstudio/cache-labtaxa.R
 
 # Create metadata file for reproducibility tracking
 RUN mkdir -p /home/rstudio && \

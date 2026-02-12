@@ -41,8 +41,6 @@
 #' @param companioncachename Default: `"cached-morph-SPC.rds"`; file name for cached morphologic `SoilProfileCollection`
 #' @param dirname Data cache directory for the labtaxa package. Default: `tools::R_user_dir(package = "labtaxa")`.
 #'   This directory is created automatically if it doesn't exist.
-#' @param default_dir Default directory where RSelenium Firefox downloads files before moving to cache.
-#'   Default: `"~/Downloads"`. Useful if your default browser download location differs.
 #' @param port Default: `4567L`; port number for Selenium WebDriver. Change if port is already in use.
 #' @param timeout Default: `1e5` seconds (~27.8 hours); maximum time to wait for file download
 #' @param baseurl Default: `"https://ncsslabdatamart.sc.egov.usda.gov/database_download.aspx"`;
@@ -109,7 +107,6 @@ get_LDM_snapshot <- function(...,
                              companiondbname = "ncss_morphologic.sqlite",
                              companioncachename = "cached-morph-SPC.rds",
                              dirname = tools::R_user_dir(package = "labtaxa"),
-                             default_dir = "~/Downloads",
                              port = 4567L,
                              timeout = 1e5,
                              baseurl = ldm_db_download_url()) {
@@ -132,7 +129,7 @@ get_LDM_snapshot <- function(...,
         dirname = dirname,
         dlname = dlname,
         morphdlname = companiondlname,
-        default_dir = default_dir,
+        companiondbname = companiondbname,
         baseurl = baseurl,
         timeout = timeout,
         keep_zip = keep_zip,
@@ -497,9 +494,9 @@ ldm_data_dir <- function() {
 .get_ldm_snapshot <- function(dirname = ldm_data_dir(),
                               dlname = "ncss_labdatagpkg.zip",
                               morphdlname = "ncss_morphologic.zip",
+                              companiondbname = "ncss_morphologic.sqlite",
                               keep_zip = FALSE,
                               overwrite = FALSE,
-                              default_dir = "~/Downloads",
                               port = 4567L,
                               baseurl = ldm_db_download_url(),
                               timeout = 1e5,
@@ -511,11 +508,6 @@ ldm_data_dir <- function() {
   if (!dir.exists(target_dir)) {
     if (verbose) message(sprintf("Creating data directory: %s", target_dir))
     dir.create(target_dir, recursive = TRUE)
-  }
-
-  if (!dir.exists(default_dir)) {
-    if (verbose) message(sprintf("Creating downloads directory: %s", default_dir))
-    dir.create(default_dir, recursive = TRUE)
   }
 
   # Create Firefox profile for headless download with improved settings
@@ -563,10 +555,8 @@ ldm_data_dir <- function() {
   on.exit(try(remDr$close()))
 
   orig_file_name <- list.files(target_dir, dlname)
-  orig_dfile_name <- list.files(default_dir, dlname)
 
-  if (overwrite ||
-      (!dlname %in% orig_file_name && !dlname %in% orig_dfile_name)) {
+  if (overwrite || !dlname %in% orig_file_name) {
 
     remDr$navigate(baseurl)
 
@@ -600,31 +590,21 @@ ldm_data_dir <- function() {
     if (verbose) message("Waiting for LDM database download to complete...")
     while (!file_found_complete) {
       file_name <- list.files(target_dir, dlname, full.names = TRUE)
-      dfile_name <- list.files(default_dir, dlname, full.names = TRUE)
 
-      # Also check for .part files (Firefox downloads to .part with random name, then renames on completion)
+      # Firefox downloads to .part with random name, then renames on completion
       # Pattern: ncss_labdatagpkg.RANDOM.zip.part -> *.zip.part
       part_file_target <- list.files(target_dir, "\\.zip\\.part$", full.names = TRUE)
-      part_file_default <- list.files(default_dir, "\\.zip\\.part$", full.names = TRUE)
 
-      # Check for completed file in either location
-      if (length(dfile_name) > 0 && file.size(dfile_name[1]) > 1000000) {
-        if (verbose) message(sprintf("Download complete: %.2f MB", file.size(dfile_name[1]) / 1024 / 1024))
-        file_found_complete <- TRUE
-        break
-      } else if (length(file_name) > 0 && file.size(file_name[1]) > 1000000) {
+      # Check for completed file
+      if (length(file_name) > 0 && file.size(file_name[1]) > 1000000) {
         if (verbose) message(sprintf("Download complete: %.2f MB", file.size(file_name[1]) / 1024 / 1024))
         file_found_complete <- TRUE
         break
       } else {
         # Report progress based on .part file size
         current_size <- 0
-        if (length(part_file_default) > 0) {
-          current_size <- file.size(part_file_default[1])
-        } else if (length(part_file_target) > 0) {
+        if (length(part_file_target) > 0) {
           current_size <- file.size(part_file_target[1])
-        } else if (length(dfile_name) > 0) {
-          current_size <- file.size(dfile_name[1])
         } else if (length(file_name) > 0) {
           current_size <- file.size(file_name[1])
         }
@@ -641,15 +621,6 @@ ldm_data_dir <- function() {
         break
       }
     }
-  } else {
-     dfile_name <- orig_dfile_name
-  }
-
-  # allow download to default directory, just move to target first
-  new_dfile_name <- dfile_name[!dfile_name %in% orig_dfile_name]
-  if (length(new_dfile_name) > 0) {
-    file.copy(new_dfile_name, target_dir)
-    file.remove(new_dfile_name)
   }
 
   # Validate that LDM file was actually downloaded with reasonable size
