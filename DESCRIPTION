@@ -1,7 +1,7 @@
 Package: labtaxa
 Type: Package
 Title: Fetch and Process USDA-NRCS-NCSS Lab Data Mart 'SQLite' Snapshot
-Version: 0.0.3
+Version: 0.0.4
 Authors@R: person(given = "Andrew", family = "Brown", 
                   role = c("aut", "cre"), 
                   email = "andrew.g.brown@usda.gov", 
@@ -17,7 +17,16 @@ Suggests:
     testthat (>= 3.0.0),
     covr,
     plumber,
-    pkgdown
+    pkgdown,
+    remotes,
+    devtools,
+    Rcpp,
+    terra,
+    sf,
+    ggplot2,
+    tidyterra,
+    rmarkdown,
+    httr
 Encoding: UTF-8
 LazyData: true
 Language: en-US

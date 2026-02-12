@@ -36,10 +36,11 @@ RUN mkdir -p /renv/cache
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    cmake \ 
+    cmake \
     pkg-config \
     libxml2 \
     git \
+    libgit2-dev \
     build-essential \
     libproj-dev \
     libgdal-dev \
@@ -50,7 +51,10 @@ RUN apt-get update \
     libxml2-dev \
     libsqlite3-dev \
     libfribidi-dev \
+    libharfbuzz-dev \
     libudunits2-dev \
+    libfontconfig1-dev \
+    libfreetype6-dev \
     default-jre \
     default-jdk \
     libcurl4-openssl-dev \
@@ -61,7 +65,7 @@ RUN apt-get update \
     libx11-xcb-dev \
     libdbus-glib-1-2 \
     libxt6 \
-    libpci-dev \ 
+    libpci-dev \
     libabsl-dev
 
 RUN wget https://download-installer.cdn.mozilla.net/pub/firefox/releases/109.0/linux-x86_64/en-US/firefox-109.0.tar.bz2
@@ -72,6 +76,7 @@ RUN ln -s /opt/firefox/firefox /usr/local/bin/firefox
 # Copy renv files early to leverage Docker layer caching
 # This allows renv::restore() layer to be cached if renv.lock hasn't changed
 WORKDIR /tmp/labtaxa-renv
+COPY DESCRIPTION DESCRIPTION
 COPY renv.lock renv.lock
 COPY .Rprofile .Rprofile
 COPY renv/activate.R renv/activate.R
@@ -79,28 +84,35 @@ COPY renv/activate.R renv/activate.R
 # Restore exact package versions from lockfile
 # This replaces the old install2.r approach with reproducible package management
 RUN R --slave -e "renv::restore()" && \
+    R --slave -e "renv::install(c('remotes', 'devtools', 'Rcpp', 'terra', 'sf', 'ggplot2', 'tidyterra', 'rmarkdown', 'httr'))" && \
+    R --slave -e "renv::snapshot(type = 'all')" && \
+    R --slave -e "renv::clean()" && \
     rm -rf renv/library renv/staging
 
-# Copy demo and install scripts
+# Copy demo and install scripts, plus .Rprofile and renv for renv activation
+RUN cp /tmp/labtaxa-renv/renv.lock /home/rstudio/
 COPY misc/install.R /home/rstudio/
 COPY misc/demo.R /home/rstudio/
+COPY .Rprofile /home/rstudio/.Rprofile
+COPY renv /home/rstudio/renv
 
-# Return to root directory for repository operations
+# Copy local repository (build context) instead of cloning from remote
 WORKDIR /
-
-RUN git clone https://github.com/brownag/labtaxa
+COPY . ./labtaxa
 
 RUN mkdir /root/labtaxa_data
 RUN mkdir -p /home/rstudio/.local/share/R/labtaxa/
 
-# Install remotes before running install.R
-RUN R --slave -e "install.packages('remotes')"
+# Copy labtaxa before running install.R
+RUN cp -r /labtaxa /home/rstudio/labtaxa
 
-RUN Rscript /home/rstudio/install.R
+# Change to /home/rstudio so .Rprofile is found and renv is activated
+WORKDIR /home/rstudio
+RUN R --no-save < /dev/null -e "renv::restore()" && \
+    R --no-save < /dev/null -f install.R
 RUN rm /home/rstudio/install.R
 
-RUN cp -r ./labtaxa /home/rstudio/labtaxa
-RUN rm -r ./labtaxa
+RUN rm -r /labtaxa
 RUN cp -r ~/labtaxa_data/* /home/rstudio/.local/share/R/labtaxa/
 RUN rm -r ~/labtaxa_data
 RUN rm -r ~/Downloads

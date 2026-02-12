@@ -119,7 +119,7 @@ get_LDM_snapshot <- function(...,
   mp <- file.path(dirname, companiondbname)
 
   if (cache && file.exists(cp)) {
-    load_labtaxa(cachename, dirname)
+    return(load_labtaxa(cachename, dirname))
   }
 
   stopifnot(requireNamespace("RSQLite"))
@@ -518,10 +518,15 @@ ldm_data_dir <- function() {
     dir.create(default_dir, recursive = TRUE)
   }
 
-  # Create Firefox profile for headless download
+  # Create Firefox profile for headless download with improved settings
   fprof <- RSelenium::makeFirefoxProfile(list(
     browser.download.dir = normalizePath(target_dir),
-    browser.download.folderList = 2
+    browser.download.folderList = 2,  # Use custom folder
+    browser.helperApps.neverAsk.saveToDisk = "application/zip,application/octet-stream",
+    browser.download.manager.showAlertOnComplete = FALSE,
+    browser.download.manager.showWhenStarting = FALSE,
+    pdfjs.disabled = TRUE,
+    plugin.scan.plg.state = 0
   ))
   eCaps <- list(
     firefox_profile = fprof$firefox_profile,
@@ -565,35 +570,74 @@ ldm_data_dir <- function() {
 
     remDr$navigate(baseurl)
 
-        # need to click the tab to access the "spatial" lab data downloads
-    tabElem <- remDr$findElement("name" , "tabularSpatial")
-    tabElem$clickElement()
-    webElem <- remDr$findElement("id", "btnDownloadSpatialGeoPackageFile")
-    webElem$clickElement()
+    # Wait for page to load before clicking elements
+    Sys.sleep(2)
+
+    # Try to click the tab to access the "spatial" lab data downloads
+    tryCatch({
+      if (verbose) message("Clicking spatial data tab...")
+      tabElem <- remDr$findElement("name", "tabularSpatial")
+      tabElem$clickElement()
+      Sys.sleep(1)
+    }, error = function(e) {
+      if (verbose) warning(sprintf("Could not find/click spatial tab: %s", conditionMessage(e)))
+    })
+
+    # Click the download button
+    tryCatch({
+      if (verbose) message("Clicking GeoPackage download button...")
+      webElem <- remDr$findElement("id", "btnDownloadSpatialGeoPackageFile")
+      webElem$clickElement()
+      if (verbose) message("Download initiated")
+    }, error = function(e) {
+      if (verbose) warning(sprintf("Could not find/click download button: %s", conditionMessage(e)))
+    })
 
     ncycle <- 0
-    file_name <- dfile_name <- character()
+    file_found_complete <- FALSE
 
-    # wait for downloaded file to appear in browser download directory
-    while (length(file_name) <= length(orig_file_name) &
-           length(dfile_name) <= length(orig_dfile_name)) {
+    # wait for downloaded file to appear in browser download directory with valid size
+    if (verbose) message("Waiting for LDM database download to complete...")
+    while (!file_found_complete) {
       file_name <- list.files(target_dir, dlname, full.names = TRUE)
       dfile_name <- list.files(default_dir, dlname, full.names = TRUE)
-      if (length(dfile_name) > 0 || length(file_name) > 0) {
-        if ((!is.na(dfile_name[1]) && file.size(dfile_name[1]) > 0)
-            || (!is.na(file_name[1]) && file.size(file_name[1]) > 0)) {
-          break
-        } else {
-          if (ncycle %% 60 == 0) {
-            print(ncycle)
-          }
+
+      # Also check for .part files (Firefox downloads to .part with random name, then renames on completion)
+      # Pattern: ncss_labdatagpkg.RANDOM.zip.part -> *.zip.part
+      part_file_target <- list.files(target_dir, "\\.zip\\.part$", full.names = TRUE)
+      part_file_default <- list.files(default_dir, "\\.zip\\.part$", full.names = TRUE)
+
+      # Check for completed file in either location
+      if (length(dfile_name) > 0 && file.size(dfile_name[1]) > 1000000) {
+        if (verbose) message(sprintf("Download complete: %.2f MB", file.size(dfile_name[1]) / 1024 / 1024))
+        file_found_complete <- TRUE
+        break
+      } else if (length(file_name) > 0 && file.size(file_name[1]) > 1000000) {
+        if (verbose) message(sprintf("Download complete: %.2f MB", file.size(file_name[1]) / 1024 / 1024))
+        file_found_complete <- TRUE
+        break
+      } else {
+        # Report progress based on .part file size
+        current_size <- 0
+        if (length(part_file_default) > 0) {
+          current_size <- file.size(part_file_default[1])
+        } else if (length(part_file_target) > 0) {
+          current_size <- file.size(part_file_target[1])
+        } else if (length(dfile_name) > 0) {
+          current_size <- file.size(dfile_name[1])
+        } else if (length(file_name) > 0) {
+          current_size <- file.size(file_name[1])
+        }
+
+        if (ncycle %% 10 == 0 && verbose) {
+          message(sprintf("Elapsed time %d seconds - current size: %.2f MB", ncycle, current_size / 1024 / 1024))
         }
       }
+
       Sys.sleep(1)
       ncycle <- ncycle + 1
-      # print(ncycle)
       if (ncycle > timeout) {
-        print("Timed out")
+        if (verbose) warning(sprintf("Download timeout after %d seconds - file may be incomplete", timeout))
         break
       }
     }
@@ -608,16 +652,36 @@ ldm_data_dir <- function() {
     file.remove(new_dfile_name)
   }
 
+  # Validate that LDM file was actually downloaded with reasonable size
+  ldm_file <- file.path(target_dir, dlname)
+  if (!file.exists(ldm_file) || file.size(ldm_file) < 1000000) {
+    # File is missing or suspiciously small (< 1 MB)
+    warning(
+      sprintf(
+        "Warning: LDM database file %s is missing or suspiciously small (%s bytes).\n",
+        dlname,
+        if (file.exists(ldm_file)) file.size(ldm_file) else "0"
+      ),
+      "The RSelenium browser download may have failed.\n",
+      "This can happen in headless/Docker environments.\n",
+      "Continuing with available data, but results may be incomplete.",
+      call. = FALSE
+    )
+  }
+
   # Download companion morphologic database with retry logic
   dcompanion <- file.path(target_dir, morphdlname)
   if (nchar(dcompanion) > 0 && !file.exists(dcompanion)) {
     if (verbose) message("Downloading companion morphologic database...")
     oldtimeout <- getOption("timeout")
-    options(timeout = 1e5)
+    # Set very long timeout for large file downloads (135+ MB)
+    # Handles slow/unreliable network connections
+    options(timeout = 3600)  # 1 hour timeout per attempt, with 5 retries = 5 hours max
     tryCatch({
       .download_with_retry(
         "https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download",
         destfile = dcompanion,
+        max_attempts = 5,
         verbose = verbose
       )
     }, error = function(e) {
@@ -635,12 +699,40 @@ ldm_data_dir <- function() {
   }
 
   zf <- list.files(target_dir, "zip$", full.names = TRUE)
-  sapply(zf, function(z) utils::unzip(z, exdir = target_dir))
+
+  # Extract zip files with error handling
+  for (z in zf) {
+    if (verbose) message(sprintf("Extracting %s...", basename(z)))
+    tryCatch({
+      utils::unzip(z, exdir = target_dir, list = FALSE)
+      if (verbose) message(sprintf("Successfully extracted %s", basename(z)))
+    }, error = function(e) {
+      warning(sprintf(
+        "Failed to extract %s: %s",
+        basename(z),
+        conditionMessage(e)
+      ), call. = FALSE)
+    })
+  }
 
   # TODO: generalize this for a future standardized morphologic database internal filename
   oldfn <- file.path(target_dir, "NASIS_Morphological_09142021.sqlite")
   if (file.exists(oldfn)) {
-    file.rename(oldfn, file.path(target_dir, morphdlname))
+    if (verbose) message(sprintf("Renaming %s to %s", basename(oldfn), companiondbname))
+    file.rename(oldfn, file.path(target_dir, companiondbname))
+  }
+
+  # Validate that expected database files exist after extraction
+  expected_files <- c(
+    file.path(target_dir, gsub("\\.zip$", ".gpkg", dlname)),
+    file.path(target_dir, companiondbname)
+  )
+  for (f in expected_files) {
+    if (!file.exists(f)) {
+      if (verbose) warning(sprintf("Expected file not found after extraction: %s", basename(f)))
+    } else if (verbose) {
+      message(sprintf("Confirmed: %s (%.2f MB)", basename(f), file.size(f) / 1024 / 1024))
+    }
   }
 
   if (isFALSE(keep_zip)) {
