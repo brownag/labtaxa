@@ -595,6 +595,17 @@ ldm_data_dir <- function() {
       # Pattern: ncss_labdatagpkg.RANDOM.zip.part -> *.zip.part
       part_file_target <- list.files(target_dir, "\\.zip\\.part$", full.names = TRUE)
 
+      # Fallback: check ~/Downloads in case Firefox profile didn't redirect
+      downloads_dir <- path.expand("~/Downloads")
+      if (length(file_name) == 0 && dir.exists(downloads_dir)) {
+        downloads_file <- list.files(downloads_dir, dlname, full.names = TRUE)
+        if (length(downloads_file) > 0) {
+          file.copy(downloads_file[1], target_dir, overwrite = TRUE)
+          file.remove(downloads_file[1])
+          file_name <- list.files(target_dir, dlname, full.names = TRUE)
+        }
+      }
+
       # Check for completed file
       if (length(file_name) > 0 && file.size(file_name[1]) > 1000000) {
         if (verbose) message(sprintf("Download complete: %.2f MB", file.size(file_name[1]) / 1024 / 1024))
