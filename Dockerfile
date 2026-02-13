@@ -15,8 +15,9 @@
 # docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/Documents -e ROOT=TRUE brownag/labtaxa
 # Then open http://localhost:8787 (username: rstudio, password: mypassword)
 
-# R version: Update this when new R releases are available
+# Version arguments
 ARG R_VERSION=4.5.2
+ARG FIREFOX_VERSION=140.7.0esr
 
 FROM rocker/rstudio:${R_VERSION}
 
@@ -24,6 +25,7 @@ FROM rocker/rstudio:${R_VERSION}
 ARG BUILD_DATE
 ARG VERSION=0.0.3
 ARG DATA_VERSION
+ARG FIREFOX_VERSION
 
 # OCI-compliant metadata labels
 LABEL org.opencontainers.image.title="labtaxa"
@@ -78,8 +80,8 @@ RUN apt-get update \
     libabsl-dev \
     libsodium-dev
 
-RUN wget https://download-installer.cdn.mozilla.net/pub/firefox/releases/109.0/linux-x86_64/en-US/firefox-109.0.tar.bz2
-RUN tar -xjf firefox-*.tar.bz2
+RUN wget https://download-installer.cdn.mozilla.net/pub/firefox/releases/${FIREFOX_VERSION}/linux-x86_64/en-US/firefox-${FIREFOX_VERSION}.tar.xz
+RUN tar -xJf firefox-*.tar.xz
 RUN mv firefox /opt
 RUN ln -s /opt/firefox/firefox /usr/local/bin/firefox
 
