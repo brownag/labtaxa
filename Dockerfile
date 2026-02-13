@@ -116,7 +116,6 @@ COPY . ./labtaxa
 
 RUN mkdir /root/labtaxa_data
 RUN mkdir -p /home/rstudio/.local/share/R/labtaxa/
-RUN mkdir -p /home/rstudio/Downloads
 
 # Copy labtaxa before running build scripts
 RUN cp -r /labtaxa /home/rstudio/labtaxa

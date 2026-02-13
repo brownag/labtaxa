@@ -597,12 +597,20 @@ ldm_data_dir <- function() {
 
       # Fallback: check ~/Downloads in case Firefox profile didn't redirect
       downloads_dir <- path.expand("~/Downloads")
-      if (length(file_name) == 0 && dir.exists(downloads_dir)) {
-        downloads_file <- list.files(downloads_dir, dlname, full.names = TRUE)
-        if (length(downloads_file) > 0) {
-          file.copy(downloads_file[1], target_dir, overwrite = TRUE)
-          file.remove(downloads_file[1])
-          file_name <- list.files(target_dir, dlname, full.names = TRUE)
+      if (length(file_name) == 0) {
+        if (verbose) message(sprintf("Checking for fallback in %s", downloads_dir))
+        if (dir.exists(downloads_dir)) {
+          all_files <- list.files(downloads_dir, full.names = TRUE)
+          if (verbose && length(all_files) > 0) message(sprintf("Found %d files in Downloads: %s", length(all_files), paste(basename(all_files), collapse=", ")))
+          downloads_file <- list.files(downloads_dir, dlname, full.names = TRUE)
+          if (length(downloads_file) > 0) {
+            if (verbose) message(sprintf("Found target file in Downloads, moving to %s", target_dir))
+            file.copy(downloads_file[1], target_dir, overwrite = TRUE)
+            file.remove(downloads_file[1])
+            file_name <- list.files(target_dir, dlname, full.names = TRUE)
+          }
+        } else if (verbose && ncycle %% 30 == 0) {
+          message(sprintf("Downloads directory does not exist: %s", downloads_dir))
         }
       }
 
