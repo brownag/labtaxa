@@ -1,13 +1,23 @@
+# syntax=docker/dockerfile:1.4
 # Reference: https://aboland.ie/Docker.html
-# Build Steps:
+# Build Steps (requires BuildKit):
 
-# docker build -t brownag/labtaxa .
+# Using docker buildx (recommended):
+# docker buildx build -t brownag/labtaxa .
+
+# Or with standard docker build:
+# DOCKER_BUILDKIT=1 docker build -t brownag/labtaxa .
+
+# Push to registry:
 # docker push brownag/labtaxa:latest
-# docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/Documents -e ROOT=TRUE brownag/labtaxa
-# Then open your web browser and navigate to `http://localhost:8787`. The default username is `rstudio` and the default password is `mypassword`.
 
-# R version: Update this when new R releases are available
+# Run container:
+# docker run -d -p 8787:8787 -e PASSWORD=mypassword -v ~/Documents:/home/rstudio/Documents -e ROOT=TRUE brownag/labtaxa
+# Then open http://localhost:8787 (username: rstudio, password: mypassword)
+
+# Version arguments
 ARG R_VERSION=4.5.2
+ARG FIREFOX_VERSION=140.7.0esr
 
 FROM rocker/rstudio:${R_VERSION}
 
@@ -15,6 +25,7 @@ FROM rocker/rstudio:${R_VERSION}
 ARG BUILD_DATE
 ARG VERSION=0.0.3
 ARG DATA_VERSION
+ARG FIREFOX_VERSION
 
 # OCI-compliant metadata labels
 LABEL org.opencontainers.image.title="labtaxa"
@@ -36,10 +47,11 @@ RUN mkdir -p /renv/cache
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-    cmake \ 
+    cmake \
     pkg-config \
     libxml2 \
     git \
+    libgit2-dev \
     build-essential \
     libproj-dev \
     libgdal-dev \
@@ -50,7 +62,10 @@ RUN apt-get update \
     libxml2-dev \
     libsqlite3-dev \
     libfribidi-dev \
+    libharfbuzz-dev \
     libudunits2-dev \
+    libfontconfig1-dev \
+    libfreetype6-dev \
     default-jre \
     default-jdk \
     libcurl4-openssl-dev \
@@ -61,17 +76,19 @@ RUN apt-get update \
     libx11-xcb-dev \
     libdbus-glib-1-2 \
     libxt6 \
-    libpci-dev \ 
-    libabsl-dev
+    libpci-dev \
+    libabsl-dev \
+    libsodium-dev
 
-RUN wget https://download-installer.cdn.mozilla.net/pub/firefox/releases/109.0/linux-x86_64/en-US/firefox-109.0.tar.bz2
-RUN tar -xjf firefox-*.tar.bz2
+RUN wget https://download-installer.cdn.mozilla.net/pub/firefox/releases/${FIREFOX_VERSION}/linux-x86_64/en-US/firefox-${FIREFOX_VERSION}.tar.xz
+RUN tar -xJf firefox-*.tar.xz
 RUN mv firefox /opt
 RUN ln -s /opt/firefox/firefox /usr/local/bin/firefox
 
 # Copy renv files early to leverage Docker layer caching
 # This allows renv::restore() layer to be cached if renv.lock hasn't changed
 WORKDIR /tmp/labtaxa-renv
+COPY DESCRIPTION DESCRIPTION
 COPY renv.lock renv.lock
 COPY .Rprofile .Rprofile
 COPY renv/activate.R renv/activate.R
@@ -79,31 +96,50 @@ COPY renv/activate.R renv/activate.R
 # Restore exact package versions from lockfile
 # This replaces the old install2.r approach with reproducible package management
 RUN R --slave -e "renv::restore()" && \
+    R --slave -e "renv::install(c('remotes', 'devtools', 'Rcpp', 'terra', 'sf', 'ggplot2', 'tidyterra', 'rmarkdown', 'httr'))" && \
+    R --slave -e "renv::snapshot(type = 'all')" && \
+    R --slave -e "renv::clean()" && \
     rm -rf renv/library renv/staging
 
-# Copy demo and install scripts
-COPY misc/install.R /home/rstudio/
+# Copy modularized build scripts, plus .Rprofile and renv for renv activation
+RUN cp /tmp/labtaxa-renv/renv.lock /home/rstudio/
+COPY misc/download-ldm.R /home/rstudio/
+COPY misc/download-osd.R /home/rstudio/
+COPY misc/cache-labtaxa.R /home/rstudio/
 COPY misc/demo.R /home/rstudio/
+COPY .Rprofile /home/rstudio/.Rprofile
+COPY renv /home/rstudio/renv
 
-# Return to root directory for repository operations
+# Copy local repository (build context) instead of cloning from remote
 WORKDIR /
-
-RUN git clone https://github.com/brownag/labtaxa
+COPY . ./labtaxa
 
 RUN mkdir /root/labtaxa_data
 RUN mkdir -p /home/rstudio/.local/share/R/labtaxa/
 
-# Install remotes before running install.R
-RUN R --slave -e "install.packages('remotes')"
+# Copy labtaxa before running build scripts
+RUN cp -r /labtaxa /home/rstudio/labtaxa
 
-RUN Rscript /home/rstudio/install.R
-RUN rm /home/rstudio/install.R
+# Change to /home/rstudio so .Rprofile is found and renv is activated
+WORKDIR /home/rstudio
 
-RUN cp -r ./labtaxa /home/rstudio/labtaxa
-RUN rm -r ./labtaxa
-RUN cp -r ~/labtaxa_data/* /home/rstudio/.local/share/R/labtaxa/
-RUN rm -r ~/labtaxa_data
-RUN rm -r ~/Downloads
+# Restore renv environment
+RUN R --no-save < /dev/null -e "renv::restore()"
+
+# Download LDM snapshot (includes morphologic database via get_LDM_snapshot)
+RUN --mount=type=cache,target=/home/rstudio/labtaxa_data \
+    R --no-save < /dev/null -f download-ldm.R
+
+# Download OSD and SC data
+RUN --mount=type=cache,target=/home/rstudio/labtaxa_data \
+    R --no-save < /dev/null -f download-osd.R
+
+# Cache data as SoilProfileCollection objects and install package
+RUN R --no-save < /dev/null -f cache-labtaxa.R
+
+# Clean up (cache mount persists between builds, final image doesn't include it)
+RUN rm -rf /labtaxa && \
+    rm -f /home/rstudio/download-ldm.R /home/rstudio/download-osd.R /home/rstudio/cache-labtaxa.R
 
 # Create metadata file for reproducibility tracking
 RUN mkdir -p /home/rstudio && \
