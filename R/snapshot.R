@@ -609,13 +609,12 @@ ldm_data_dir <- function() {
     if (verbose) message("Download initiated")
 
     ncycle <- 0
-    file_name <- dfile_name <- character()
 
     # Wait for downloaded file to appear in browser download directory
     # Firefox creates .part file during download, .zip file stays 0 bytes until complete
     if (verbose) message("Waiting for LDM database download to complete...")
-    while (length(file_name) <= length(orig_file_name) &&
-           length(dfile_name) <= length(orig_default_file_name)) {
+    download_complete <- FALSE
+    while (!download_complete) {
       file_name <- list.files(target_dir, dlname, full.names = TRUE)
       dfile_name <- list.files(default_dir, dlname, full.names = TRUE)
 
@@ -641,11 +640,12 @@ ldm_data_dir <- function() {
 
       current_size <- max(target_size, default_size)
 
-      # Download complete when .part file disappears and final file is renamed
-      if ((length(file_name) > length(orig_file_name) || length(dfile_name) > length(orig_default_file_name)) &&
-          length(part_files_target) == 0 && length(part_files_default) == 0 &&
+      # Download complete when .part files disappear and final files have content
+      if (length(part_files_target) == 0 && length(part_files_default) == 0 &&
+          (length(file_name) > 0 || length(dfile_name) > 0) &&
           current_size > 0) {
         if (verbose) message(sprintf("Download complete: %.2f MB", current_size / 1024 / 1024))
+        download_complete <- TRUE
         break
       }
 
