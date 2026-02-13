@@ -500,6 +500,7 @@ ldm_data_dir <- function() {
                               port = 4567L,
                               baseurl = ldm_db_download_url(),
                               timeout = 1e5,
+                              default_dir = "~/Downloads",
                               verbose = TRUE) {
 
   stopifnot(requireNamespace("RSelenium"))
@@ -555,6 +556,8 @@ ldm_data_dir <- function() {
   on.exit(try(remDr$close()))
 
   orig_file_name <- list.files(target_dir, dlname)
+  default_dir <- path.expand(default_dir)
+  orig_default_file_name <- if (dir.exists(default_dir)) list.files(default_dir, dlname) else character(0)
 
   if (overwrite || !dlname %in% orig_file_name) {
 
@@ -584,53 +587,30 @@ ldm_data_dir <- function() {
     })
 
     ncycle <- 0
-    file_found_complete <- FALSE
 
-    # wait for downloaded file to appear in browser download directory with valid size
+    # Wait for downloaded file to appear in either target_dir or default_dir
     if (verbose) message("Waiting for LDM database download to complete...")
-    while (!file_found_complete) {
+    while (length(list.files(target_dir, dlname)) <= length(orig_file_name) &&
+           length(list.files(default_dir, dlname, full.names = FALSE)) <= length(orig_default_file_name)) {
+
       file_name <- list.files(target_dir, dlname, full.names = TRUE)
+      default_file_name <- list.files(default_dir, dlname, full.names = TRUE)
 
-      # Firefox downloads to .part with random name, then renames on completion
-      # Pattern: ncss_labdatagpkg.RANDOM.zip.part -> *.zip.part
-      part_file_target <- list.files(target_dir, "\\.zip\\.part$", full.names = TRUE)
-
-      # Fallback: check ~/Downloads in case Firefox profile didn't redirect
-      downloads_dir <- path.expand("~/Downloads")
-      if (length(file_name) == 0) {
-        if (verbose) message(sprintf("Checking for fallback in %s", downloads_dir))
-        if (dir.exists(downloads_dir)) {
-          all_files <- list.files(downloads_dir, full.names = TRUE)
-          if (verbose && length(all_files) > 0) message(sprintf("Found %d files in Downloads: %s", length(all_files), paste(basename(all_files), collapse=", ")))
-          downloads_file <- list.files(downloads_dir, dlname, full.names = TRUE)
-          if (length(downloads_file) > 0) {
-            if (verbose) message(sprintf("Found target file in Downloads, moving to %s", target_dir))
-            file.copy(downloads_file[1], target_dir, overwrite = TRUE)
-            file.remove(downloads_file[1])
-            file_name <- list.files(target_dir, dlname, full.names = TRUE)
-          }
-        } else if (verbose && ncycle %% 30 == 0) {
-          message(sprintf("Downloads directory does not exist: %s", downloads_dir))
+      # Check if we have a completed file in either location
+      if (length(file_name) > 0 || length(default_file_name) > 0) {
+        check_file <- if (length(file_name) > 0) file_name[1] else default_file_name[1]
+        if (file.size(check_file) > 1000000) {
+          if (verbose) message(sprintf("Download complete: %.2f MB", file.size(check_file) / 1024 / 1024))
+          break
         }
       }
 
-      # Check for completed file
-      if (length(file_name) > 0 && file.size(file_name[1]) > 1000000) {
-        if (verbose) message(sprintf("Download complete: %.2f MB", file.size(file_name[1]) / 1024 / 1024))
-        file_found_complete <- TRUE
-        break
-      } else {
-        # Report progress based on .part file size
-        current_size <- 0
-        if (length(part_file_target) > 0) {
-          current_size <- file.size(part_file_target[1])
-        } else if (length(file_name) > 0) {
-          current_size <- file.size(file_name[1])
-        }
-
-        if (ncycle %% 10 == 0 && verbose) {
-          message(sprintf("Elapsed time %d seconds - current size: %.2f MB", ncycle, current_size / 1024 / 1024))
-        }
+      # Report progress
+      if (ncycle %% 10 == 0 && verbose) {
+        target_size <- if (length(file_name) > 0) file.size(file_name[1]) else 0
+        default_size <- if (length(default_file_name) > 0) file.size(default_file_name[1]) else 0
+        current_size <- max(target_size, default_size)
+        message(sprintf("Elapsed time %d seconds - current size: %.2f MB", ncycle, current_size / 1024 / 1024))
       }
 
       Sys.sleep(1)
@@ -640,6 +620,15 @@ ldm_data_dir <- function() {
         break
       }
     }
+  }
+
+  # Move any files that were downloaded to default_dir to target_dir
+  default_file_name <- list.files(default_dir, dlname, full.names = TRUE)
+  new_default_files <- default_file_name[!default_file_name %in% file.path(default_dir, orig_default_file_name)]
+  if (length(new_default_files) > 0) {
+    if (verbose) message(sprintf("Moving downloaded file(s) from %s to %s", default_dir, target_dir))
+    file.copy(new_default_files, target_dir)
+    file.remove(new_default_files)
   }
 
   # Validate that LDM file was actually downloaded with reasonable size
