@@ -581,11 +581,12 @@ ldm_data_dir <- function() {
   if (overwrite || !dlname %in% orig_file_name) {
 
     remDr$navigate(baseurl)
+    if (verbose) message(sprintf("Navigated to %s", baseurl))
 
     # Wait for page to load before clicking elements
     Sys.sleep(2)
 
-    # Try to click the tab to access the "spatial" lab data downloads
+    # Click the tab to access the "spatial" lab data downloads
     tryCatch({
       if (verbose) message("Clicking spatial data tab...")
       tabElem <- remDr$findElement("name", "tabularSpatial")
@@ -600,34 +601,56 @@ ldm_data_dir <- function() {
       if (verbose) message("Clicking GeoPackage download button...")
       webElem <- remDr$findElement("id", "btnDownloadSpatialGeoPackageFile")
       webElem$clickElement()
-      if (verbose) message("Download initiated")
+      Sys.sleep(2)
     }, error = function(e) {
       if (verbose) warning(sprintf("Could not find/click download button: %s", conditionMessage(e)))
     })
+
+    if (verbose) message("Download initiated")
 
     ncycle <- 0
     file_name <- dfile_name <- character()
 
     # Wait for downloaded file to appear in browser download directory
+    # Firefox creates .part file during download, .zip file stays 0 bytes until complete
     if (verbose) message("Waiting for LDM database download to complete...")
     while (length(file_name) <= length(orig_file_name) &&
            length(dfile_name) <= length(orig_default_file_name)) {
       file_name <- list.files(target_dir, dlname, full.names = TRUE)
       dfile_name <- list.files(default_dir, dlname, full.names = TRUE)
 
-      if (length(dfile_name) > 0 || length(file_name) > 0) {
-        target_size <- if (length(file_name) > 0) file.size(file_name[1]) else 0
-        default_size <- if (length(dfile_name) > 0) file.size(dfile_name[1]) else 0
-        current_size <- max(target_size, default_size)
+      # Check for .part files (actual download in progress)
+      part_files_target <- list.files(target_dir, "\\.part$", full.names = TRUE)
+      part_files_default <- list.files(default_dir, "\\.part$", full.names = TRUE)
 
-        if (current_size > 0) {
-          if (verbose) message(sprintf("Download complete: %.2f MB", current_size / 1024 / 1024))
-          break
-        } else {
-          if (ncycle %% 10 == 0 && verbose) {
-            message(sprintf("Elapsed time %d seconds - current size: %.2f MB", ncycle, current_size / 1024 / 1024))
-          }
-        }
+      # Determine current download size from .part files or final files
+      target_size <- 0
+      default_size <- 0
+
+      if (length(part_files_target) > 0) {
+        target_size <- file.size(part_files_target[1])
+      } else if (length(file_name) > 0) {
+        target_size <- file.size(file_name[1])
+      }
+
+      if (length(part_files_default) > 0) {
+        default_size <- file.size(part_files_default[1])
+      } else if (length(dfile_name) > 0) {
+        default_size <- file.size(dfile_name[1])
+      }
+
+      current_size <- max(target_size, default_size)
+
+      # Download complete when .part file disappears and final file is renamed
+      if ((length(file_name) > length(orig_file_name) || length(dfile_name) > length(orig_default_file_name)) &&
+          length(part_files_target) == 0 && length(part_files_default) == 0 &&
+          current_size > 0) {
+        if (verbose) message(sprintf("Download complete: %.2f MB", current_size / 1024 / 1024))
+        break
+      }
+
+      if (ncycle %% 10 == 0 && verbose) {
+        message(sprintf("Elapsed time %d seconds - current size: %.2f MB", ncycle, current_size / 1024 / 1024))
       }
 
       Sys.sleep(1)
@@ -643,14 +666,23 @@ ldm_data_dir <- function() {
   dfile_name <- list.files(default_dir, dlname, full.names = TRUE)
   new_dfile_name <- dfile_name[!dfile_name %in% file.path(default_dir, orig_default_file_name)]
   if (length(new_dfile_name) > 0) {
-    if (verbose) message(sprintf("Found file(s) in %s: %s", default_dir, paste(basename(new_dfile_name), collapse=", ")))
+    if (verbose) message(sprintf("Found file(s) in %s:", default_dir))
+    valid_files <- character()
     for (f in new_dfile_name) {
       f_size <- file.size(f)
       if (verbose) message(sprintf("  %s: %.2f MB", basename(f), f_size / 1024 / 1024))
+      if (f_size > 0) {
+        valid_files <- c(valid_files, f)
+      }
     }
-    file.copy(new_dfile_name, target_dir)
-    file.remove(new_dfile_name)
-    if (verbose) message("Files moved to target directory")
+
+    if (length(valid_files) > 0) {
+      if (verbose) message(sprintf("Moving %d file(s) to target directory", length(valid_files)))
+      file.copy(valid_files, target_dir)
+      file.remove(valid_files)
+    } else {
+      if (verbose) warning("Found files in default directory but all are 0 bytes - download may have failed")
+    }
   }
 
   # Validate that LDM file was actually downloaded with reasonable size
@@ -701,12 +733,22 @@ ldm_data_dir <- function() {
 
   zf <- list.files(target_dir, "zip$", full.names = TRUE)
 
-  # Extract zip files with error handling
+  # Extract zip files with validation
   for (z in zf) {
-    if (verbose) message(sprintf("Extracting %s...", basename(z)))
+    z_size <- file.size(z)
+    if (verbose) message(sprintf("Extracting %s (%.2f MB)...", basename(z), z_size / 1024 / 1024))
+
+    if (z_size < 100000) {
+      warning(sprintf("Zip file %s is suspiciously small (%.2f MB) - may be invalid", basename(z), z_size / 1024 / 1024), call. = FALSE)
+    }
+
     tryCatch({
-      utils::unzip(z, exdir = target_dir, list = FALSE)
-      if (verbose) message(sprintf("Successfully extracted %s", basename(z)))
+      files_extracted <- utils::unzip(z, exdir = target_dir, list = FALSE)
+      if (length(files_extracted) > 0) {
+        if (verbose) message(sprintf("Successfully extracted %d file(s) from %s", length(files_extracted), basename(z)))
+      } else {
+        warning(sprintf("No files extracted from %s - zip may be empty or invalid", basename(z)), call. = FALSE)
+      }
     }, error = function(e) {
       warning(sprintf(
         "Failed to extract %s: %s",
@@ -747,13 +789,12 @@ ldm_data_dir <- function() {
   )
   .write_snapshot_metadata(target_dir, data_files)
 
-  # close rselenium with timeout
+  # close rselenium (non-blocking)
   if (verbose) message("Closing RSelenium driver...")
   tryCatch({
-    withTimeout({
-      remDr$close()
-    }, timeout = 10)
+    remDr$close()
+    if (verbose) message("RSelenium driver closed")
   }, error = function(e) {
-    if (verbose) warning(sprintf("RSelenium close timed out or failed: %s", conditionMessage(e)))
+    if (verbose) warning(sprintf("RSelenium close failed: %s", conditionMessage(e)))
   })
 }
