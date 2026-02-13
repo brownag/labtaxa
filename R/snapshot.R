@@ -157,19 +157,38 @@ get_LDM_snapshot <- function(...,
   })
 
   if (file.exists(mp)) {
-    if (verbose) message("Patching morphologic database...")
-    tryCatch({
-      .patch_morph_snapshot(mp)
+    if (verbose) message(sprintf("Validating morphologic database: %s", mp))
+    # Quick validation: try to list tables
+    validation_ok <- tryCatch({
+      con <- RSQLite::dbConnect(RSQLite::SQLite(), mp)
+      tbls <- RSQLite::dbListTables(con)
+      RSQLite::dbDisconnect(con)
+      if (verbose) message(sprintf("Database contains %d tables", length(tbls)))
+      length(tbls) > 0
     }, error = function(e) {
-      warning(sprintf(
-        "Error patching morphologic database: %s\nMorphologic data may not be available.",
-        conditionMessage(e)
-      ), call. = FALSE)
+      if (verbose) warning(sprintf("Failed to validate morphologic database: %s", conditionMessage(e)))
+      FALSE
     })
+
+    if (validation_ok) {
+      if (verbose) message("Patching morphologic database...")
+      tryCatch({
+        .patch_morph_snapshot(mp)
+      }, error = function(e) {
+        warning(sprintf(
+          "Error patching morphologic database: %s\nMorphologic data may not be available.",
+          conditionMessage(e)
+        ), call. = FALSE)
+      })
+    } else if (verbose) {
+      message("Skipping morphologic database patching - validation failed")
+    }
+  } else {
+    if (verbose) message(sprintf("Morphologic database not found: %s", mp))
   }
 
   # Load LDM data with error handling
-  if (verbose) message("Loading Lab Data Mart data...")
+  if (verbose) message(sprintf("Loading Lab Data Mart data from %s (%.2f MB)...", fp, file.size(fp) / 1024 / 1024))
   res <- tryCatch({
     soilDB::fetchLDM(dsn = fp, chunk.size = 1e7, ...)
   }, error = function(e) {
@@ -183,7 +202,7 @@ get_LDM_snapshot <- function(...,
 
   # Load morphologic data with graceful fallback
   if (file.exists(mp)) {
-    if (verbose) message("Loading morphologic data...")
+    if (verbose) message(sprintf("Loading morphologic data from %s (%.2f MB)...", mp, file.size(mp) / 1024 / 1024))
     su <- getOption("soilDB.NASIS.skip_uncode")
     options(soilDB.NASIS.skip_uncode = TRUE)
     morph <- tryCatch({
@@ -587,30 +606,28 @@ ldm_data_dir <- function() {
     })
 
     ncycle <- 0
+    file_name <- dfile_name <- character()
 
-    # Wait for downloaded file to appear in either target_dir or default_dir
+    # Wait for downloaded file to appear in browser download directory
     if (verbose) message("Waiting for LDM database download to complete...")
-    while (length(list.files(target_dir, dlname)) <= length(orig_file_name) &&
-           length(list.files(default_dir, dlname, full.names = FALSE)) <= length(orig_default_file_name)) {
-
+    while (length(file_name) <= length(orig_file_name) &&
+           length(dfile_name) <= length(orig_default_file_name)) {
       file_name <- list.files(target_dir, dlname, full.names = TRUE)
-      default_file_name <- list.files(default_dir, dlname, full.names = TRUE)
+      dfile_name <- list.files(default_dir, dlname, full.names = TRUE)
 
-      # Check if we have a completed file in either location
-      if (length(file_name) > 0 || length(default_file_name) > 0) {
-        check_file <- if (length(file_name) > 0) file_name[1] else default_file_name[1]
-        if (file.size(check_file) > 1000000) {
-          if (verbose) message(sprintf("Download complete: %.2f MB", file.size(check_file) / 1024 / 1024))
-          break
-        }
-      }
-
-      # Report progress
-      if (ncycle %% 10 == 0 && verbose) {
+      if (length(dfile_name) > 0 || length(file_name) > 0) {
         target_size <- if (length(file_name) > 0) file.size(file_name[1]) else 0
-        default_size <- if (length(default_file_name) > 0) file.size(default_file_name[1]) else 0
+        default_size <- if (length(dfile_name) > 0) file.size(dfile_name[1]) else 0
         current_size <- max(target_size, default_size)
-        message(sprintf("Elapsed time %d seconds - current size: %.2f MB", ncycle, current_size / 1024 / 1024))
+
+        if (current_size > 0) {
+          if (verbose) message(sprintf("Download complete: %.2f MB", current_size / 1024 / 1024))
+          break
+        } else {
+          if (ncycle %% 10 == 0 && verbose) {
+            message(sprintf("Elapsed time %d seconds - current size: %.2f MB", ncycle, current_size / 1024 / 1024))
+          }
+        }
       }
 
       Sys.sleep(1)
@@ -623,12 +640,17 @@ ldm_data_dir <- function() {
   }
 
   # Move any files that were downloaded to default_dir to target_dir
-  default_file_name <- list.files(default_dir, dlname, full.names = TRUE)
-  new_default_files <- default_file_name[!default_file_name %in% file.path(default_dir, orig_default_file_name)]
-  if (length(new_default_files) > 0) {
-    if (verbose) message(sprintf("Moving downloaded file(s) from %s to %s", default_dir, target_dir))
-    file.copy(new_default_files, target_dir)
-    file.remove(new_default_files)
+  dfile_name <- list.files(default_dir, dlname, full.names = TRUE)
+  new_dfile_name <- dfile_name[!dfile_name %in% file.path(default_dir, orig_default_file_name)]
+  if (length(new_dfile_name) > 0) {
+    if (verbose) message(sprintf("Found file(s) in %s: %s", default_dir, paste(basename(new_dfile_name), collapse=", ")))
+    for (f in new_dfile_name) {
+      f_size <- file.size(f)
+      if (verbose) message(sprintf("  %s: %.2f MB", basename(f), f_size / 1024 / 1024))
+    }
+    file.copy(new_dfile_name, target_dir)
+    file.remove(new_dfile_name)
+    if (verbose) message("Files moved to target directory")
   }
 
   # Validate that LDM file was actually downloaded with reasonable size
@@ -725,6 +747,13 @@ ldm_data_dir <- function() {
   )
   .write_snapshot_metadata(target_dir, data_files)
 
-  # close rselenium
-  try(remDr$close())
+  # close rselenium with timeout
+  if (verbose) message("Closing RSelenium driver...")
+  tryCatch({
+    withTimeout({
+      remDr$close()
+    }, timeout = 10)
+  }, error = function(e) {
+    if (verbose) warning(sprintf("RSelenium close timed out or failed: %s", conditionMessage(e)))
+  })
 }
