@@ -21,7 +21,7 @@ processed results. Creates the directory if it doesn't exist."></head><body>
 
     <a class="navbar-brand me-2" href="../index.html">labtaxa</a>
 
-    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">0.0.3</small>
+    <small class="nav-text text-muted me-auto" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Released version">0.0.4</small>
 
 
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar" aria-controls="navbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -72,7 +72,6 @@ processed results. Creates the directory if it doesn't exist.</p>
 <span>  companiondbname <span class="op">=</span> <span class="st">"ncss_morphologic.sqlite"</span>,</span>
 <span>  companioncachename <span class="op">=</span> <span class="st">"cached-morph-SPC.rds"</span>,</span>
 <span>  dirname <span class="op">=</span> <span class="fu">tools</span><span class="fu">::</span><span class="fu"><a href="https://rdrr.io/r/tools/userdir.html" class="external-link">R_user_dir</a></span><span class="op">(</span>package <span class="op">=</span> <span class="st">"labtaxa"</span><span class="op">)</span>,</span>
-<span>  default_dir <span class="op">=</span> <span class="st">"~/Downloads"</span>,</span>
 <span>  port <span class="op">=</span> <span class="fl">4567L</span>,</span>
 <span>  timeout <span class="op">=</span> <span class="fl">1e+05</span>,</span>
 <span>  baseurl <span class="op">=</span> <span class="fu">ldm_db_download_url</span><span class="op">(</span><span class="op">)</span></span>
@@ -133,11 +132,6 @@ extraction? Set to <code>TRUE</code> to preserve raw downloads for manual inspec
 <dt id="arg-dirname">dirname<a class="anchor" aria-label="anchor" href="#arg-dirname"></a></dt>
 <dd><p>Data cache directory for the labtaxa package. Default: <code>tools::R_user_dir(package = "labtaxa")</code>.
 This directory is created automatically if it doesn't exist.</p></dd>
-
-
-<dt id="arg-default-dir">default_dir<a class="anchor" aria-label="anchor" href="#arg-default-dir"></a></dt>
-<dd><p>Default directory where RSelenium Firefox downloads files before moving to cache.
-Default: <code>"~/Downloads"</code>. Useful if your default browser download location differs.</p></dd>
 
 
 <dt id="arg-port">port<a class="anchor" aria-label="anchor" href="#arg-port"></a></dt>

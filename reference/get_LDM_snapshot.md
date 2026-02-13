@@ -27,7 +27,6 @@ get_LDM_snapshot(
   companiondbname = "ncss_morphologic.sqlite",
   companioncachename = "cached-morph-SPC.rds",
   dirname = tools::R_user_dir(package = "labtaxa"),
-  default_dir = "~/Downloads",
   port = 4567L,
   timeout = 1e+05,
   baseurl = ldm_db_download_url()
@@ -98,12 +97,6 @@ ldm_data_dir()
   Data cache directory for the labtaxa package. Default:
   `tools::R_user_dir(package = "labtaxa")`. This directory is created
   automatically if it doesn't exist.
-
-- default_dir:
-
-  Default directory where RSelenium Firefox downloads files before
-  moving to cache. Default: `"~/Downloads"`. Useful if your default
-  browser download location differs.
 
 - port:
 
