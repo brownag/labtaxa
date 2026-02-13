@@ -17,7 +17,7 @@
 
 # Version arguments
 ARG R_VERSION=4.5.2
-ARG FIREFOX_VERSION=140.7.0esr
+ARG FIREFOX_VERSION=109.0
 
 FROM rocker/rstudio:${R_VERSION}
 
@@ -80,8 +80,8 @@ RUN apt-get update \
     libabsl-dev \
     libsodium-dev
 
-RUN wget https://download-installer.cdn.mozilla.net/pub/firefox/releases/${FIREFOX_VERSION}/linux-x86_64/en-US/firefox-${FIREFOX_VERSION}.tar.xz
-RUN tar -xJf firefox-*.tar.xz
+RUN wget https://download-installer.cdn.mozilla.net/pub/firefox/releases/${FIREFOX_VERSION}/linux-x86_64/en-US/firefox-${FIREFOX_VERSION}.tar.bz2
+RUN tar -xjf firefox-*.tar.bz2
 RUN mv firefox /opt
 RUN ln -s /opt/firefox/firefox /usr/local/bin/firefox
 
@@ -128,8 +128,7 @@ WORKDIR /home/rstudio
 RUN R --no-save < /dev/null -e "renv::restore()"
 
 # Download LDM snapshot (includes morphologic database via get_LDM_snapshot)
-RUN --mount=type=cache,target=/home/rstudio/labtaxa_data \
-    R --no-save < /dev/null -f download-ldm.R
+RUN R --no-save < /dev/null -f download-ldm.R
 
 # Download OSD and SC data
 RUN --mount=type=cache,target=/home/rstudio/labtaxa_data \
