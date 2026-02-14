@@ -9,4 +9,7 @@
 ^Dockerfile$
 ^_pkgdown.yml$
 ^docker-compose.yml$
+^Makefile$
+^scripts$
+^build$
 ^\..*$

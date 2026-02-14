@@ -22,9 +22,9 @@ ARG FIREFOX_VERSION=140.7.0esr
 FROM rocker/rstudio:${R_VERSION}
 
 # Build arguments for versioning and metadata
-ARG BUILD_DATE
+ARG BUILD_DATE=unknown
 ARG VERSION=0.0.3
-ARG DATA_VERSION
+ARG DATA_VERSION=unknown
 ARG FIREFOX_VERSION
 
 # OCI-compliant metadata labels
@@ -150,13 +150,15 @@ RUN rm -rf /labtaxa && \
 
 # Create metadata file for reproducibility tracking
 RUN mkdir -p /home/rstudio && \
-    echo "{ \
-      \"build_date\": \"${BUILD_DATE}\", \
-      \"data_version\": \"${DATA_VERSION}\", \
-      \"r_version\": \"${R_VERSION}\", \
-      \"rocker_base\": \"rocker/rstudio:${R_VERSION}\", \
-      \"package_version\": \"${VERSION}\" \
-    }" > /home/rstudio/.labtaxa-metadata.json && \
-    cat /home/rstudio/.labtaxa-metadata.json
+    cat > /home/rstudio/.labtaxa-metadata.json <<EOF
+{
+  "build_date": "${BUILD_DATE}",
+  "data_version": "${DATA_VERSION}",
+  "r_version": "${R_VERSION}",
+  "rocker_base": "rocker/rstudio:${R_VERSION}",
+  "package_version": "${VERSION}"
+}
+EOF
+cat /home/rstudio/.labtaxa-metadata.json
 
 RUN chown -hR rstudio /home/rstudio /home/rstudio

@@ -34,5 +34,39 @@ if (file.exists(file.path(cache_dir, "ncss_labdata.gpkg"))) {
   stop("LDM database not found")
 }
 
+# Generate snapshot metadata with checksums for reproducibility
+message("Generating snapshot metadata...")
+ldm_db <- file.path(cache_dir, "ncss_labdata.gpkg")
+morph_db <- file.path(cache_dir, "ncss_morphologic.sqlite")
+
+metadata <- list(
+  snapshot_date = as.character(Sys.Date()),
+  download_timestamp = as.character(Sys.time()),
+  r_version = paste(R.version$major, R.version$minor, sep = "."),
+  package_version = as.character(utils::packageVersion("labtaxa")),
+  checksums = list()
+)
+
+# Add checksums for existing files
+if (file.exists(ldm_db)) {
+  metadata$checksums[[basename(ldm_db)]] <- list(
+    file = basename(ldm_db),
+    sha256 = digest::digest(file = ldm_db, algo = "sha256"),
+    size_bytes = file.size(ldm_db)
+  )
+}
+
+if (file.exists(morph_db)) {
+  metadata$checksums[[basename(morph_db)]] <- list(
+    file = basename(morph_db),
+    sha256 = digest::digest(file = morph_db, algo = "sha256"),
+    size_bytes = file.size(morph_db)
+  )
+}
+
+metadata_path <- file.path(cache_dir, "snapshot-metadata.json")
+jsonlite::write_json(metadata, path = metadata_path, auto_unbox = TRUE, pretty = TRUE)
+message(sprintf("Metadata written to: %s", metadata_path))
+
 unlink("/home/rstudio/labtaxa_data", recursive = TRUE)
 unlink(path.expand("~/Downloads"), recursive = TRUE)
