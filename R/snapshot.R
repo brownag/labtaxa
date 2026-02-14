@@ -127,7 +127,7 @@ get_LDM_snapshot <- function(...,
   if (ldm_needs_download) {
     if (verbose) message("Downloading KSSL Lab Data Mart snapshot...")
     tryCatch({
-      .get_ldm_snapshot(
+      .download_ldm_snapshot(
         port = port,
         dirname = dirname,
         dlname = dlname,
@@ -149,53 +149,12 @@ get_LDM_snapshot <- function(...,
 
     # Even if LDM is cached, ensure morphologic database is downloaded if needed
     if (morph_needs_download) {
-      if (verbose) message("Downloading companion morphologic database...")
-      oldtimeout <- getOption("timeout")
-      options(timeout = 3600)
-      tryCatch({
-        dcompanion <- file.path(dirname, companiondlname)
-        .download_with_retry(
-          "https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download",
-          destfile = dcompanion,
-          max_attempts = 5,
-          verbose = verbose
-        )
-
-        # Extract and setup morphologic database
-        if (file.exists(dcompanion)) {
-          if (verbose) message(sprintf("Extracting morphologic database from %s...", companiondlname))
-          extracted_files <- utils::unzip(dcompanion, exdir = dirname)
-
-          # Find and rename .sqlite files
-          sqlite_files <- extracted_files[grepl("\\.sqlite$", extracted_files, ignore.case = TRUE)]
-          if (length(sqlite_files) > 0) {
-            src_file <- sqlite_files[1]
-            file.rename(src_file, mp)
-            if (verbose) message(sprintf("Extracted morphologic database: %s", basename(mp)))
-          } else {
-            # Check for legacy filename
-            legacy_file <- file.path(dirname, "NASIS_Morphological_09142021.sqlite")
-            if (file.exists(legacy_file)) {
-              file.rename(legacy_file, mp)
-              if (verbose) message(sprintf("Found legacy morphologic database: %s", basename(mp)))
-            }
-          }
-
-          # Clean up zip file
-          file.remove(dcompanion)
-        }
-      }, error = function(e) {
-        warning(
-          sprintf(
-            "Could not download companion morphologic database: %s\n",
-            "You can continue with LDM data only.",
-            conditionMessage(e)
-          ),
-          call. = FALSE
-        )
-      }, finally = {
-        options(timeout = oldtimeout)
-      })
+      .download_morph_snapshot(
+        dirname = dirname,
+        morphdlname = companiondlname,
+        companiondbname = companiondbname,
+        verbose = verbose
+      )
     }
   }
 
@@ -576,9 +535,85 @@ ldm_data_dir <- function() {
   DBI::dbDisconnect(con)
 }
 
+#' Download companion morphologic database
+#'
+#' Downloads the NASIS morphologic database from CloudVault with retry logic.
+#' Extracts and renames the SQLite file. Called internally by get_LDM_snapshot().
+#'
+#' @param dirname Directory where morphologic database will be saved
+#' @param morphdlname Name of the morphologic ZIP file to download
+#' @param companiondbname Name of the extracted morphologic SQLite database
+#' @param verbose Print status messages
+#' @return Invisibly returns TRUE if successful, FALSE if download fails
+#' @keywords internal
+#' @noRd
+.download_morph_snapshot <- function(dirname = ldm_data_dir(),
+                                      morphdlname = "ncss_morphologic.zip",
+                                      companiondbname = "ncss_morphologic.sqlite",
+                                      verbose = TRUE) {
+  dcompanion <- file.path(dirname, morphdlname)
+  mp <- file.path(dirname, companiondbname)
+
+  if (!dir.exists(dirname)) {
+    dir.create(dirname, recursive = TRUE)
+  }
+
+  oldtimeout <- getOption("timeout")
+  options(timeout = 3600)
+
+  tryCatch({
+    if (verbose) message("Downloading companion morphologic database...")
+    .download_with_retry(
+      "https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download",
+      destfile = dcompanion,
+      max_attempts = 5,
+      verbose = verbose
+    )
+
+    # Extract and setup morphologic database
+    if (file.exists(dcompanion)) {
+      if (verbose) message(sprintf("Extracting morphologic database from %s...", morphdlname))
+      extracted_files <- utils::unzip(dcompanion, exdir = dirname)
+
+      # Find and rename .sqlite files
+      sqlite_files <- extracted_files[grepl("\\.sqlite$", extracted_files, ignore.case = TRUE)]
+      if (length(sqlite_files) > 0) {
+        src_file <- sqlite_files[1]
+        file.rename(src_file, mp)
+        if (verbose) message(sprintf("Extracted morphologic database: %s", basename(mp)))
+      } else {
+        # Check for legacy filename
+        legacy_file <- file.path(dirname, "NASIS_Morphological_09142021.sqlite")
+        if (file.exists(legacy_file)) {
+          file.rename(legacy_file, mp)
+          if (verbose) message(sprintf("Found legacy morphologic database: %s", basename(mp)))
+        }
+      }
+
+      # Clean up zip file
+      file.remove(dcompanion)
+      invisible(TRUE)
+    } else {
+      invisible(FALSE)
+    }
+  }, error = function(e) {
+    warning(
+      sprintf(
+        "Could not download companion morphologic database: %s\n",
+        "You can continue with LDM data only.",
+        conditionMessage(e)
+      ),
+      call. = FALSE
+    )
+    invisible(FALSE)
+  }, finally = {
+    options(timeout = oldtimeout)
+  })
+}
+
 #' @importFrom utils download.file unzip
 #' @importFrom RSelenium makeFirefoxProfile rsDriver
-.get_ldm_snapshot <- function(dirname = ldm_data_dir(),
+.download_ldm_snapshot <- function(dirname = ldm_data_dir(),
                               dlname = "ncss_labdatagpkg.zip",
                               morphdlname = "ncss_morphologic.zip",
                               companiondbname = "ncss_morphologic.sqlite",
