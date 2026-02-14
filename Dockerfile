@@ -137,6 +137,10 @@ RUN --mount=type=cache,target=/home/rstudio/labtaxa_data \
 # Cache data as SoilProfileCollection objects and install package
 RUN R --no-save < /dev/null -f cache-labtaxa.R
 
+# Verify cached RDS files exist
+RUN echo "Verifying cached RDS files:" && \
+    ls -lh /home/rstudio/.local/share/R/labtaxa/ || echo "Cache directory not found"
+
 # Clean up (cache mount persists between builds, final image doesn't include it)
 RUN rm -rf /labtaxa && \
     rm -f /home/rstudio/download-ldm.R /home/rstudio/download-osd.R /home/rstudio/cache-labtaxa.R

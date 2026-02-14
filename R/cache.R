@@ -66,8 +66,34 @@
 cache_labtaxa <- function(x,
                           filename = "cached-LDM-SPC.rds",
                           destdir = tools::R_user_dir(package = "labtaxa")) {
+
+  # Ensure destination directory exists
+  if (!dir.exists(destdir)) {
+    dir.create(destdir, recursive = TRUE)
+  }
+
   fp <- file.path(destdir, filename)
-  saveRDS(x, file = fp)
+
+  tryCatch({
+    saveRDS(x, file = fp)
+    if (file.exists(fp)) {
+      file_size <- file.size(fp)
+      if (file_size > 0) {
+        message(sprintf("Cached %s: %.2f MB", filename, file_size / 1024 / 1024))
+      } else {
+        warning(sprintf("Saved file is empty: %s", fp))
+      }
+    } else {
+      warning(sprintf("Failed to save cache file: %s", fp))
+    }
+  }, error = function(e) {
+    stop(sprintf(
+      "Failed to cache data to %s: %s",
+      fp,
+      conditionMessage(e)
+    ), call. = FALSE)
+  })
+
   invisible(fp)
 }
 
