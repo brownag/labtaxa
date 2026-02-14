@@ -157,9 +157,14 @@ get_LDM_snapshot <- function(...,
   })
 
   if (file.exists(mp)) {
-    if (verbose) message(sprintf("Validating morphologic database: %s", mp))
-    # Quick validation: try to list tables
-    validation_ok <- tryCatch({
+    mp_size <- file.size(mp)
+    if (verbose) message(sprintf("Validating morphologic database: %s (%.2f MB)", mp, mp_size / 1024 / 1024))
+
+    if (mp_size < 100000) {
+      if (verbose) warning(sprintf("Morphologic database is suspiciously small (%.2f MB) - skipping patching", mp_size / 1024 / 1024))
+    } else {
+      # Quick validation: try to list tables
+      validation_ok <- tryCatch({
       con <- RSQLite::dbConnect(RSQLite::SQLite(), mp)
       tbls <- RSQLite::dbListTables(con)
       RSQLite::dbDisconnect(con)
@@ -170,18 +175,19 @@ get_LDM_snapshot <- function(...,
       FALSE
     })
 
-    if (validation_ok) {
-      if (verbose) message("Patching morphologic database...")
-      tryCatch({
-        .patch_morph_snapshot(mp)
-      }, error = function(e) {
-        warning(sprintf(
-          "Error patching morphologic database: %s\nMorphologic data may not be available.",
-          conditionMessage(e)
-        ), call. = FALSE)
-      })
-    } else if (verbose) {
-      message("Skipping morphologic database patching - validation failed")
+      if (validation_ok) {
+        if (verbose) message("Patching morphologic database...")
+        tryCatch({
+          .patch_morph_snapshot(mp)
+        }, error = function(e) {
+          warning(sprintf(
+            "Error patching morphologic database: %s\nMorphologic data may not be available.",
+            conditionMessage(e)
+          ), call. = FALSE)
+        })
+      } else if (verbose) {
+        message("Skipping morphologic database patching - validation failed")
+      }
     }
   } else {
     if (verbose) message(sprintf("Morphologic database not found: %s", mp))
@@ -478,6 +484,10 @@ ldm_data_dir <- function() {
   # patch companion db
   con <- soilDB::NASIS(dsn = dsn)
 
+  if (inherits(con, 'try-error')) {
+    stop("Failed to connect to morphologic database: ", as.character(con)[1L], call. = FALSE)
+  }
+
   ## add missing columns
   # ecologicalsitehistory: recwlupdated
   # site: stateareaiidref, countyareaiidref, mlraareaiidref
@@ -734,6 +744,7 @@ ldm_data_dir <- function() {
   zf <- list.files(target_dir, "zip$", full.names = TRUE)
 
   # Extract zip files with validation
+  morphologic_zip <- file.path(target_dir, morphdlname)
   for (z in zf) {
     z_size <- file.size(z)
     if (verbose) message(sprintf("Extracting %s (%.2f MB)...", basename(z), z_size / 1024 / 1024))
@@ -745,7 +756,25 @@ ldm_data_dir <- function() {
     tryCatch({
       files_extracted <- utils::unzip(z, exdir = target_dir, list = FALSE)
       if (length(files_extracted) > 0) {
-        if (verbose) message(sprintf("Successfully extracted %d file(s) from %s", length(files_extracted), basename(z)))
+        if (verbose) {
+          message(sprintf("Successfully extracted %d file(s) from %s", length(files_extracted), basename(z)))
+          # Log extracted files for debugging
+          for (f in files_extracted) {
+            message(sprintf("  - %s", basename(f)))
+          }
+        }
+
+        # For morphologic database, find and rename any .sqlite files extracted from this zip
+        if (z == morphologic_zip) {
+          sqlite_files <- files_extracted[grepl("\\.sqlite$", files_extracted, ignore.case = TRUE)]
+          if (length(sqlite_files) > 0) {
+            # Use the first .sqlite file found
+            src_file <- sqlite_files[1]
+            dst_file <- file.path(target_dir, companiondbname)
+            if (verbose) message(sprintf("Renaming morphologic database: %s -> %s", basename(src_file), companiondbname))
+            file.rename(src_file, dst_file)
+          }
+        }
       } else {
         warning(sprintf("No files extracted from %s - zip may be empty or invalid", basename(z)), call. = FALSE)
       }
@@ -758,10 +787,10 @@ ldm_data_dir <- function() {
     })
   }
 
-  # TODO: generalize this for a future standardized morphologic database internal filename
+  # Fallback: check for old hardcoded filename in case it wasn't renamed above
   oldfn <- file.path(target_dir, "NASIS_Morphological_09142021.sqlite")
-  if (file.exists(oldfn)) {
-    if (verbose) message(sprintf("Renaming %s to %s", basename(oldfn), companiondbname))
+  if (file.exists(oldfn) && !file.exists(file.path(target_dir, companiondbname))) {
+    if (verbose) message(sprintf("Fallback rename: %s -> %s", basename(oldfn), companiondbname))
     file.rename(oldfn, file.path(target_dir, companiondbname))
   }
 
