@@ -89,16 +89,16 @@ jobs:
         id: notes
         run: |
           cat > /tmp/release-notes.md << 'EOF'
-          ## KSSL Lab Data Mart Snapshot – ${{ steps.version.outputs.tag }}
+          ## KSSL Lab Data Mart Snapshot ${{ steps.version.outputs.tag }}
 
           Monthly snapshot of USDA NRCS KSSL database with Lab Data Mart and NASIS morphologic data.
 
           ### Contents
 
-          - `cached-LDM-SPC.rds` – Lab Data Mart profiles as SoilProfileCollection
-          - `cached-morph-SPC.rds` – NASIS morphologic data as SoilProfileCollection
-          - `snapshot-metadata.json` – Data checksums and build info
-          - `build-metadata.json` – R version and dependencies
+          - `cached-LDM-SPC.rds` - Lab Data Mart profiles as SoilProfileCollection
+          - `cached-morph-SPC.rds` - NASIS morphologic data as SoilProfileCollection
+          - `snapshot-metadata.json` - Data checksums and build info
+          - `build-metadata.json` - R version and dependencies
 
           ### Run
 
