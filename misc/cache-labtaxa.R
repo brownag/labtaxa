@@ -9,7 +9,7 @@ remotes::install_local(
 
 message("Caching data as SoilProfileCollections...")
 
-cache_dir <- tools::R_user_dir(package = "labtaxa")
+cache_dir <- "/home/rstudio/.local/share/R/labtaxa"
 download_dir <- "/home/rstudio/labtaxa_data"
 
 message(sprintf("Cache directory: %s", cache_dir))
