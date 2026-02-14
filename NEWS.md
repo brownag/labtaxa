@@ -1,8 +1,9 @@
 # labtaxa 0.0.3
 
-* Improved support for NASIS-derived companion morphologic database. 
-  - Use `load_labmorph()` to load cached RDS file containing `soilDB::fetchNASIS()` SoilProfileCollection
+* Added morphologic data support via `load_labmorph()`
+* Improved Docker build and caching
+* Fixed package data file resolution
 
 # labtaxa 0.0.1
 
-* Added a `NEWS.md` file to track changes to the package.
+* Initial release

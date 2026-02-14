@@ -47,25 +47,41 @@ jobs:
           # Create output directory
           mkdir -p /tmp/labtaxa-artifacts
 
+          echo "Attempting to extract files from Docker image..."
+
           # Extract .labtaxa-metadata.json from the built Docker image
-          # This contains checksums and build information for reproducibility
           docker run --rm ghcr.io/${{ github.repository }}:latest cat /home/rstudio/.labtaxa-metadata.json > /tmp/labtaxa-artifacts/build-metadata.json 2>/dev/null || \
           docker run --rm brownag/labtaxa:latest cat /home/rstudio/.labtaxa-metadata.json > /tmp/labtaxa-artifacts/build-metadata.json 2>/dev/null || \
           echo '{"status":"could_not_extract_metadata"}' > /tmp/labtaxa-artifacts/build-metadata.json
 
-          # Extract snapshot-metadata.json if it exists
+          # Extract snapshot-metadata.json
           docker run --rm ghcr.io/${{ github.repository }}:latest cat /home/rstudio/.local/share/R/labtaxa/snapshot-metadata.json > /tmp/labtaxa-artifacts/snapshot-metadata.json 2>/dev/null || \
           docker run --rm brownag/labtaxa:latest cat /home/rstudio/.local/share/R/labtaxa/snapshot-metadata.json > /tmp/labtaxa-artifacts/snapshot-metadata.json 2>/dev/null || \
           echo '{"status":"no_snapshot_metadata"}' > /tmp/labtaxa-artifacts/snapshot-metadata.json
 
-          # Extract cached SoilProfileCollection RDS files
-          docker run --rm ghcr.io/${{ github.repository }}:latest cat /home/rstudio/.local/share/R/labtaxa/cached-LDM-SPC.rds > /tmp/labtaxa-artifacts/cached-LDM-SPC.rds 2>/dev/null || \
-          docker run --rm brownag/labtaxa:latest cat /home/rstudio/.local/share/R/labtaxa/cached-LDM-SPC.rds > /tmp/labtaxa-artifacts/cached-LDM-SPC.rds 2>/dev/null || true
+          # Extract LDM RDS file
+          echo "Extracting cached-LDM-SPC.rds..."
+          if docker run --rm ghcr.io/${{ github.repository }}:latest cat /home/rstudio/.local/share/R/labtaxa/cached-LDM-SPC.rds > /tmp/labtaxa-artifacts/cached-LDM-SPC.rds 2>/dev/null; then
+            echo "[OK] Extracted from ghcr.io"
+          elif docker run --rm brownag/labtaxa:latest cat /home/rstudio/.local/share/R/labtaxa/cached-LDM-SPC.rds > /tmp/labtaxa-artifacts/cached-LDM-SPC.rds 2>/dev/null; then
+            echo "[OK] Extracted from Docker Hub"
+          else
+            echo "[FAILED] Could not extract cached-LDM-SPC.rds"
+          fi
 
-          docker run --rm ghcr.io/${{ github.repository }}:latest cat /home/rstudio/.local/share/R/labtaxa/cached-morph-SPC.rds > /tmp/labtaxa-artifacts/cached-morph-SPC.rds 2>/dev/null || \
-          docker run --rm brownag/labtaxa:latest cat /home/rstudio/.local/share/R/labtaxa/cached-morph-SPC.rds > /tmp/labtaxa-artifacts/cached-morph-SPC.rds 2>/dev/null || true
+          # Extract morphologic RDS file
+          echo "Extracting cached-morph-SPC.rds..."
+          if docker run --rm ghcr.io/${{ github.repository }}:latest cat /home/rstudio/.local/share/R/labtaxa/cached-morph-SPC.rds > /tmp/labtaxa-artifacts/cached-morph-SPC.rds 2>/dev/null; then
+            echo "[OK] Extracted from ghcr.io"
+          elif docker run --rm brownag/labtaxa:latest cat /home/rstudio/.local/share/R/labtaxa/cached-morph-SPC.rds > /tmp/labtaxa-artifacts/cached-morph-SPC.rds 2>/dev/null; then
+            echo "[OK] Extracted from Docker Hub"
+          else
+            echo "[FAILED] Could not extract cached-morph-SPC.rds"
+          fi
 
-          ls -lh /tmp/labtaxa-artifacts/
+          echo ""
+          echo "Extracted artifacts:"
+          ls -lh /tmp/labtaxa-artifacts/ || echo "No artifacts found"
 
           echo "metadata_extracted=true" >> $GITHUB_OUTPUT
 
@@ -73,71 +89,39 @@ jobs:
         id: notes
         run: |
           cat > /tmp/release-notes.md << 'EOF'
-          ## USDA KSSL Lab Data Mart Snapshot – ${{ steps.version.outputs.tag }}
+          ## KSSL Lab Data Mart Snapshot – ${{ steps.version.outputs.tag }}
 
-          Automated monthly snapshot of the Kellogg Soil Survey Laboratory (KSSL) database.
+          Monthly snapshot of USDA NRCS KSSL database with Lab Data Mart and NASIS morphologic data.
 
-          ### What's Included
+          ### Contents
 
-          - **Lab Data Mart SoilProfileCollection**: Processed spatial laboratory characterization data (~20,000+ soil profiles)
-          - **Morphologic SoilProfileCollection**: Processed NASIS field descriptions and pedon morphology
-          - **Original GeoPackage & Database**: Spatial laboratory characterization data and NASIS field descriptions
-          - **Companion Lookup Tables**: Taxonomic and descriptive encodings
-          - **Checksums & Metadata**: Complete provenance and integrity information
+          - `cached-LDM-SPC.rds` – Lab Data Mart profiles as SoilProfileCollection
+          - `cached-morph-SPC.rds` – NASIS morphologic data as SoilProfileCollection
+          - `snapshot-metadata.json` – Data checksums and build info
+          - `build-metadata.json` – R version and dependencies
 
-          ### Reproducibility
-
-          This container snapshot is immutable and reproducible. Use the specific tag to ensure identical results:
+          ### Run
 
           ```bash
           docker pull ghcr.io/brownag/labtaxa:${{ steps.version.outputs.tag }}
-          docker-compose up -d  # if using docker-compose.yml
+          docker run -p 8787:8787 ghcr.io/brownag/labtaxa:${{ steps.version.outputs.tag }}
           ```
 
-          All package versions are locked via renv.lock, R version is pinned (see build-metadata.json), and data checksums are verified.
+          Access RStudio at http://localhost:8787 (rstudio / soilscience)
 
-          ### Data Provenance
+          ### Load Data in R
+
+          ```r
+          library(labtaxa)
+          ldm <- load_labtaxa()
+          morph <- load_labmorph()
+          ```
+
+          ### Info
 
           - **Snapshot Date**: ${{ steps.version.outputs.date }}
-          - **Data Source**: [USDA NRCS NCSS Lab Data Mart](https://ncsslabdatamart.sc.egov.usda.gov/)
-          - **Checksums**: See attached `snapshot-metadata.json`
-
-          ### Quick Start
-
-          ```bash
-          # Clone with docker-compose
-          git clone https://github.com/brownag/labtaxa.git
-          cd labtaxa
-          docker-compose up -d
-
-          # Access RStudio at http://localhost:8787
-          # Default credentials: rstudio / soilscience
-          ```
-
-          ### Documentation
-
-          - [Website](https://brownag.github.io/labtaxa)
-          - [Getting Started Guide](https://brownag.github.io/labtaxa/articles/getting-started.html)
-          - [Docker Usage](https://brownag.github.io/labtaxa/articles/docker-usage.html)
-
-          ### Verification
-
-          Verify data integrity using the attached `snapshot-metadata.json`:
-
-          ```bash
-          # Extract and verify checksums
-          sha256sum -c snapshot-metadata.json
-          ```
-
-          ### Citation
-
-          For scientific publications, cite this specific snapshot:
-
-          > Brown, A. (2026). labtaxa: USDA KSSL Database Snapshot [${{ steps.version.outputs.tag }}]. Retrieved from https://github.com/brownag/labtaxa
-
-          ---
-
-          **Built with renv for reproducible R environments and Docker for containerized deployment.**
+          - **Source**: [USDA NRCS NCSS Lab Data Mart](https://ncsslabdatamart.sc.egov.usda.gov/)
+          - **Docs**: https://brownag.github.io/labtaxa
           EOF
 
           # Output for use in release creation
