@@ -96,17 +96,17 @@ COPY renv/activate.R renv/activate.R
 # Restore exact package versions from lockfile
 # This replaces the old install2.r approach with reproducible package management
 RUN R --slave -e "renv::restore()" && \
-    R --slave -e "renv::install(c('remotes', 'devtools', 'Rcpp', 'terra', 'sf', 'ggplot2', 'tidyterra', 'rmarkdown', 'httr', 'hms'))" && \
+    R --slave -e "renv::install(c('remotes', 'Rcpp', 'terra', 'sf', 'ggplot2', 'tidyterra', 'rmarkdown', 'httr', 'hms'))" && \
     R --slave -e "renv::snapshot(type = 'all')" && \
     R --slave -e "renv::clean()" && \
     rm -rf renv/library renv/staging
 
 # Copy modularized build scripts, plus .Rprofile and renv for renv activation
 RUN cp /tmp/labtaxa-renv/renv.lock /home/rstudio/
-COPY misc/download-ldm.R /home/rstudio/
-COPY misc/download-osd.R /home/rstudio/
-COPY misc/cache-labtaxa.R /home/rstudio/
-COPY misc/demo.R /home/rstudio/
+COPY build/download-ldm.R /home/rstudio/
+COPY build/download-osd.R /home/rstudio/
+COPY build/cache-labtaxa.R /home/rstudio/
+COPY build/demo.R /home/rstudio/
 COPY .Rprofile /home/rstudio/.Rprofile
 COPY renv /home/rstudio/renv
 
@@ -125,6 +125,9 @@ WORKDIR /home/rstudio
 
 # Restore renv environment
 RUN R --no-save < /dev/null -e "renv::restore()"
+
+# Install labtaxa package so download scripts can load functions
+RUN R --no-save < /dev/null -e "remotes::install_local('./labtaxa', repos = c('https://ncss-tech.r-universe.dev', getOption('repos')), dependencies = FALSE)"
 
 # Download LDM snapshot (includes morphologic database via get_LDM_snapshot)
 RUN --mount=type=cache,target=/home/rstudio/labtaxa_data \

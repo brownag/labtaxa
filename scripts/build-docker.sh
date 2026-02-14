@@ -44,8 +44,9 @@ if [[ "$CLEAN_BUILD" == "true" ]]; then
   echo "Mode: CLEAN (no cache)"
   BUILD_CMD="${BUILD_CMD} --no-cache"
 else
-  echo "Mode: CACHED (registry cache)"
-  BUILD_CMD="${BUILD_CMD} --cache-from=type=registry,ref=${IMAGE}:buildcache --cache-to=type=registry,ref=${IMAGE}:buildcache,mode=max"
+  echo "Mode: CACHED (layer cache)"
+  # Only use registry cache with docker-container driver (used in CI/CD)
+  # Local docker driver uses default layer caching
 fi
 
 BUILD_CMD="${BUILD_CMD} ."
