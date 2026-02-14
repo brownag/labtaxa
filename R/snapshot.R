@@ -47,7 +47,7 @@
 #'   URL of the KSSL Lab Data Mart download page
 #'
 #' @importFrom soilDB fetchLDM fetchNASIS
-#' @importFrom aqp site horizons
+#' @importFrom aqp site horizons metadata
 #' @importClassesFrom aqp SoilProfileCollection
 #'
 #' @return A `SoilProfileCollection` object (from the `aqp` package) containing
@@ -96,6 +96,65 @@
 #' mean_clay <- mean(horizons_data$clay_r, na.rm = TRUE)
 #' cat(sprintf("Mean clay content: %.1f%%\\n", mean_clay))
 #' }
+#' Attach labtaxa metadata to a SoilProfileCollection
+#'
+#' Adds snapshot-specific metadata to a SoilProfileCollection object,
+#' including checksums, timestamps, and data provenance. Called internally
+#' by get_LDM_snapshot() to annotate cached SPC objects.
+#'
+#' @param object A `SoilProfileCollection` object
+#' @param data_source Character string: "LDM" or "morphologic"
+#' @param snapshot_date Date of the data snapshot (YYYY-MM-DD format)
+#' @param ldm_checksum SHA256 checksum of LDM database file (optional)
+#' @param morph_checksum SHA256 checksum of morphologic database file (optional)
+#' @return The `SoilProfileCollection` object with attached metadata
+#' @keywords internal
+#' @noRd
+.attach_snapshot_metadata <- function(object,
+                                       data_source = "LDM",
+                                       snapshot_date = Sys.Date(),
+                                       ldm_checksum = NULL,
+                                       morph_checksum = NULL) {
+  stopifnot(inherits(object, "SoilProfileCollection"))
+
+  # Get existing metadata or create new
+  md <- aqp::metadata(object)
+  if (is.null(md) || !is.list(md)) {
+    md <- list()
+  }
+
+  # Add labtaxa-specific metadata
+  md$labtaxa <- list(
+    snapshot_date = as.character(snapshot_date),
+    download_timestamp = as.character(Sys.time()),
+    data_source = data_source,
+    r_version = paste(R.version$major, R.version$minor, sep = "."),
+    package_version = as.character(utils::packageVersion("labtaxa")),
+    data_url = if (data_source == "LDM") {
+      "https://ncsslabdatamart.sc.egov.usda.gov/"
+    } else {
+      "https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download"
+    },
+    citation = sprintf(
+      "Brown, A.G., et al. (%s). KSSL Lab Data Mart snapshot. https://github.com/brownag/labtaxa",
+      format(Sys.Date(), "%Y")
+    )
+  )
+
+  # Add checksums if provided
+  if (!is.null(ldm_checksum)) {
+    md$labtaxa$ldm_checksum <- ldm_checksum
+  }
+  if (!is.null(morph_checksum)) {
+    md$labtaxa$morph_checksum <- morph_checksum
+  }
+
+  # Attach metadata back to object
+  aqp::metadata(object) <- md
+
+  invisible(object)
+}
+
 get_LDM_snapshot <- function(...,
                              cache = TRUE,
                              verbose = TRUE,
@@ -238,6 +297,26 @@ get_LDM_snapshot <- function(...,
   } else {
     morph <- NULL
     if (verbose) message("Morphologic database not found, continuing with LDM data only")
+  }
+
+  # Attach labtaxa-specific metadata to SPC objects
+  if (verbose) message("Attaching snapshot metadata to profiles...")
+  res <- .attach_snapshot_metadata(
+    res,
+    data_source = "LDM",
+    snapshot_date = Sys.Date(),
+    ldm_checksum = .calculate_checksum(fp),
+    morph_checksum = if (file.exists(mp)) .calculate_checksum(mp) else NULL
+  )
+
+  if (!is.null(morph)) {
+    morph <- .attach_snapshot_metadata(
+      morph,
+      data_source = "morphologic",
+      snapshot_date = Sys.Date(),
+      ldm_checksum = .calculate_checksum(fp),
+      morph_checksum = if (file.exists(mp)) .calculate_checksum(mp) else NULL
+    )
   }
 
   # Cache results
