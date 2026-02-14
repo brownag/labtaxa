@@ -121,7 +121,10 @@ get_LDM_snapshot <- function(...,
 
   stopifnot(requireNamespace("RSQLite"))
 
-  if (!file.exists(fp) || !cache) {
+  ldm_needs_download <- !file.exists(fp) || !cache
+  morph_needs_download <- !file.exists(mp)
+
+  if (ldm_needs_download) {
     if (verbose) message("Downloading KSSL Lab Data Mart snapshot...")
     tryCatch({
       .get_ldm_snapshot(
@@ -143,6 +146,57 @@ get_LDM_snapshot <- function(...,
     })
   } else {
     if (verbose) message(sprintf("Using cached database: %s", fp))
+
+    # Even if LDM is cached, ensure morphologic database is downloaded if needed
+    if (morph_needs_download) {
+      if (verbose) message("Downloading companion morphologic database...")
+      oldtimeout <- getOption("timeout")
+      options(timeout = 3600)
+      tryCatch({
+        dcompanion <- file.path(dirname, companiondlname)
+        .download_with_retry(
+          "https://new.cloudvault.usda.gov/index.php/s/tdnrQzzJ7ty39gs/download",
+          destfile = dcompanion,
+          max_attempts = 5,
+          verbose = verbose
+        )
+
+        # Extract and setup morphologic database
+        if (file.exists(dcompanion)) {
+          if (verbose) message(sprintf("Extracting morphologic database from %s...", companiondlname))
+          extracted_files <- utils::unzip(dcompanion, exdir = dirname)
+
+          # Find and rename .sqlite files
+          sqlite_files <- extracted_files[grepl("\\.sqlite$", extracted_files, ignore.case = TRUE)]
+          if (length(sqlite_files) > 0) {
+            src_file <- sqlite_files[1]
+            file.rename(src_file, mp)
+            if (verbose) message(sprintf("Extracted morphologic database: %s", basename(mp)))
+          } else {
+            # Check for legacy filename
+            legacy_file <- file.path(dirname, "NASIS_Morphological_09142021.sqlite")
+            if (file.exists(legacy_file)) {
+              file.rename(legacy_file, mp)
+              if (verbose) message(sprintf("Found legacy morphologic database: %s", basename(mp)))
+            }
+          }
+
+          # Clean up zip file
+          file.remove(dcompanion)
+        }
+      }, error = function(e) {
+        warning(
+          sprintf(
+            "Could not download companion morphologic database: %s\n",
+            "You can continue with LDM data only.",
+            conditionMessage(e)
+          ),
+          call. = FALSE
+        )
+      }, finally = {
+        options(timeout = oldtimeout)
+      })
+    }
   }
 
   # Patch databases with error handling
