@@ -510,7 +510,11 @@ ldm_data_dir <- function() {
   tables <- c("othvegclass", "geomorfeattype", "geomorfeat")
   for (tbl in tables) {
     if (!tbl %in% RSQLite::dbListTables(con)) {
-      x <- readRDS(file.path("inst", "extdata", paste0(tbl, ".rds")))
+      tbl_file <- system.file("extdata", paste0(tbl, ".rds"), package = "labtaxa")
+      if (!nzchar(tbl_file)) {
+        stop(sprintf("Required lookup table file not found: %s.rds", tbl))
+      }
+      x <- readRDS(tbl_file)
       RSQLite::dbWriteTable(con, tbl, x, overwrite = TRUE)
     }
   }
