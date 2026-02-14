@@ -159,6 +159,6 @@ RUN mkdir -p /home/rstudio && \
   "package_version": "${VERSION}"
 }
 EOF
-cat /home/rstudio/.labtaxa-metadata.json
+RUN cat /home/rstudio/.labtaxa-metadata.json
 
 RUN chown -hR rstudio /home/rstudio /home/rstudio
