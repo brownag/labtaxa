@@ -78,7 +78,8 @@ RUN apt-get update \
     libxt6 \
     libpci-dev \
     libabsl-dev \
-    libsodium-dev
+    libsodium-dev \
+    libuv1-dev
 
 RUN wget https://download-installer.cdn.mozilla.net/pub/firefox/releases/${FIREFOX_VERSION}/linux-x86_64/en-US/firefox-${FIREFOX_VERSION}.tar.xz
 RUN tar -xJf firefox-*.tar.xz
