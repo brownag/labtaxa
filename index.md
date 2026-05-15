@@ -83,6 +83,7 @@ default username is `rstudio` and the default password is `mypassword`.
 You can install the development version of {labtaxa} from GitHub:
 
 ``` r
+
 if (!require("labtaxa")) 
  remotes::install_github("brownag/labtaxa")
 ```
@@ -93,6 +94,7 @@ Download (and cache) the latest Lab Data Mart SQLite snapshot from
 <https://ncsslabdatamart.sc.egov.usda.gov/> like so:
 
 ``` r
+
 library(labtaxa)
 ldm <- get_LDM_snapshot()
 #> Loading required namespace: RSQLite
@@ -178,6 +180,7 @@ latest database and the first-step data object (as if you ran the
 specific questions.
 
 ``` r
+
 # Check the loaded object
 length(ldm)
 #> [1] 65403
@@ -526,6 +529,7 @@ docker pull ghcr.io/brownag/labtaxa:2026.02
 Then in R, check your data version:
 
 ``` r
+
 # Create sample metadata for demonstration
 metadata <- list(
   snapshot_date = "2026-02-01",
@@ -548,6 +552,7 @@ is tagged with the data snapshot date - Download
 ### Verify Data Integrity
 
 ``` r
+
 library(labtaxa)
 
 # Checksums are included in release metadata
